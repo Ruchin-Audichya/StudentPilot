@@ -106,8 +106,8 @@ CSV: `backend/data/btech_buzzwords.csv`
 
 ## 🤝 Contributors
 
-- Ruchin Audichya — core dev and product
-- Shriya Gakkhar — UI/UX and product shaping
+- Ruchin Audichya — Core Dev  
+- Shriya Gakkhar — Idea, UI/UX and product shaping, bugs fixing
 	- GitHub: https://github.com/shriya-gakkhar1
 
 If you find this useful, star the repo and share feedback!
