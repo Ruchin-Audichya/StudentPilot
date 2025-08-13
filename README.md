@@ -1,6 +1,6 @@
 <div align="center">
 
-# StudentPilot
+# Where's My Stipend
 
 Find internships that actually match your skills. Upload your resume, search with your interests, and chat with an AI career copilot — all in a sleek glassmorphism UI.
 
@@ -79,6 +79,23 @@ npm run dev
 - App: http://127.0.0.1:8080
 - API: http://127.0.0.1:8000
 
+### Optional: Enable Firebase (email/password signup + Storage)
+
+1) In `.env` set:
+
+```
+VITE_FIREBASE_ENABLED=true
+VITE_FIREBASE_API_KEY=... 
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_APP_ID=...
+```
+
+2) Restart `npm run dev`.
+
+- On Onboarding, you'll see Email + Password fields. Submitting will create/sign-in a Firebase Auth user and store the profile in Firestore at `users/{uid}`. If Firebase isn't configured, onboarding still works locally (saved to localStorage) and the app continues.
+
 ## 🔌 API quick reference
 
 POST /api/upload-resume
@@ -127,6 +144,7 @@ This project is provided as-is for learning and prototyping. Choose a license wh
 - New Landing page at `/` with responsive navbar; buttons navigate to `/onboarding` via SPA.
 - Routing updated in `src/App.tsx`; previous index flow kept inside `src/pages/Index.tsx` (exported as OldIndex in code).
 - ResumeUploader enhanced: optional Firebase Storage upload (anonymous auth) while still sending file to backend for parsing.
+- Onboarding updated: when Firebase is enabled, supports email/password signup and saves profile to Firestore. Falls back to local-only if disabled.
 - Backend hardening: optional Firebase Admin and LinkedIn scraper via env flags; duplicate `/api/chat` removed.
 - LinkedIn scraper dependencies added (selenium, webdriver-manager); Internshala remains default.
 - Buzzwords CSV loaded at startup; search falls back to resume keywords.

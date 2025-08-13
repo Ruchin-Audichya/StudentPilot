@@ -9,8 +9,14 @@ import {
   signInAnonymously,
   onAuthStateChanged,
   type Auth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  linkWithCredential,
+  EmailAuthProvider,
 } from "firebase/auth";
 import { getStorage, type FirebaseStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { getFirestore, type Firestore, doc, setDoc } from "firebase/firestore";
 
 const enabled = (import.meta.env.VITE_FIREBASE_ENABLED || "false").toString().toLowerCase() === "true";
 
@@ -29,6 +35,7 @@ function hasConfig(obj: Record<string, unknown>) {
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let storage: FirebaseStorage | null = null;
+let db: Firestore | null = null;
 
 export const FIREBASE_READY = enabled && hasConfig(config);
 
@@ -36,6 +43,7 @@ if (FIREBASE_READY) {
   app = initializeApp(config);
   auth = getAuth(app);
   storage = getStorage(app);
+  db = getFirestore(app);
   // persist session across restarts
   setPersistence(auth, browserLocalPersistence).catch(() => {});
 }
@@ -66,4 +74,30 @@ export async function uploadToStorage(file: File, pathPrefix = "resumes"): Promi
   return await getDownloadURL(task.snapshot.ref);
 }
 
-export { auth, storage };
+export async function signUpWithEmailPassword(email: string, password: string, displayName?: string): Promise<string> {
+  if (!FIREBASE_READY || !auth) throw new Error("Firebase not configured");
+  // If currently anonymous, try linking the credential
+  if (auth.currentUser && auth.currentUser.isAnonymous) {
+    const cred = EmailAuthProvider.credential(email, password);
+    const res = await linkWithCredential(auth.currentUser, cred);
+    if (displayName) await updateProfile(res.user, { displayName }).catch(() => {});
+    return res.user.uid;
+  }
+  try {
+    const res = await createUserWithEmailAndPassword(auth, email, password);
+    if (displayName) await updateProfile(res.user, { displayName }).catch(() => {});
+    return res.user.uid;
+  } catch (err: any) {
+    // If already exists, sign in instead
+    const res = await signInWithEmailAndPassword(auth, email, password);
+    if (displayName) await updateProfile(res.user, { displayName }).catch(() => {});
+    return res.user.uid;
+  }
+}
+
+export async function saveUserProfile(uid: string, data: Record<string, unknown>): Promise<void> {
+  if (!FIREBASE_READY || !db) return;
+  await setDoc(doc(db, "users", uid), data, { merge: true });
+}
+
+export { auth, storage, db };
