@@ -3,12 +3,16 @@ import io
 import fitz  # PyMuPDF
 import docx
 import google.generativeai as genai
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+import firebase_admin
+from firebase_admin import credentials, auth
+
 
 from scrapers.internshala import fetch_internships
+from scrapers.linkedin import fetch_linkedin_internships
 
 from dotenv import load_dotenv
 import csv
@@ -22,6 +26,13 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 app = FastAPI()
 
+
+# Initialize Firebase Admin SDK
+
+cred = credentials.Certificate("firebase-adminsdk.json")
+firebase_admin.initialize_app(cred)
+
+
 # Allow CORS for frontend
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +40,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Store resume text temporarily
 resume_text_store = ""
@@ -118,21 +130,23 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/search", response_model=List[Internship])
 def search_internships(req: SearchRequest):
-    """Search internships with graceful fallbacks.
-    1) Use provided query.
-    2) If empty or no results, build query from uploaded resume keywords.
-    """
     location = (req.filters.location if req.filters else None) or "India"
     q = (req.query or "").strip()
 
     # First attempt: user query
-    scraped = fetch_internships(q or "intern", location=location)
+    internshala_results = fetch_internships(q or "intern", location=location)
+    linkedin_results = fetch_linkedin_internships(q or "intern", location=location)
+
+    # Combine results
+    scraped = internshala_results + linkedin_results
 
     # Fallback: use resume keywords if no results or query empty
     if not scraped:
         kw = extract_keywords(resume_text_store)
         if kw:
-            scraped = fetch_internships(" ".join(kw[:5]), location=location)
+            internshala_results = fetch_internships(" ".join(kw[:5]), location=location)
+            linkedin_results = fetch_linkedin_internships(" ".join(kw[:5]), location=location)
+            scraped = internshala_results + linkedin_results
 
     if scraped:
         return [
@@ -193,7 +207,41 @@ def chat_with_ai(req: ChatRequest):
         return {"response": f"AI error: {str(e)}"}
 
 
+# Auth logic
+# main.py
+# Define the authentication dependency
+async def get_current_user(id_token: str = Header(...)):
+    try:
+        # Verify the ID token using the Firebase Admin SDK
+        decoded_token = auth.verify_id_token(id_token)
+        return decoded_token
+    except Exception as e:
+        # If verification fails, raise an HTTPException
+        raise HTTPException(status_code=401, detail=f"Invalid authentication credentials: {e}")
+@app.post("/api/chat")
+def chat_with_ai(req: ChatRequest, current_user: dict = Depends(get_current_user)):
+    # You can now access the user's information from the decoded token
+    user_uid = current_user.get('uid')
+    user_email = current_user.get('email')
+    
+    # Your existing chat logic
+    context = (
+        "You are a helpful career assistant. Use the user's resume only for context. "
+        "Answer internship/job related queries concisely with actionable steps."
+    )
+    prompt = f"{context}\n\nResume (optional):\n{resume_text_store[:4000]}\n\nUser: {req.message}"
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        resp = model.generate_content(prompt)
+        # ... (rest of the code)
+        return {"response": text or "Sorry, I couldn't generate a response right now."}
+    except Exception as e:
+        return {"response": f"AI error: {str(e)}"}
+
+# Initialize Firebase Admin SDK
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="127.0.0.1", port=port)
+
+
