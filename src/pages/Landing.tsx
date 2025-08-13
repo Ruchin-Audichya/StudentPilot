@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
-import resumeImg from "@/assets/resume.jpg"; // Save your resume image to src/assets/resume.jpg
+import resumeImg from "@/assets/resume.png"; // Using PNG for the resume image
 import { Link } from "react-router-dom";
 
 export default function Landing() {
@@ -92,8 +92,12 @@ export default function Landing() {
       </section>
 
       {/* Image */}
-      <div className="flex justify-center mt-16">
-        <img src={resumeImg} alt="Resume" className="w-64 rounded shadow-lg" />
+      <div className="flex justify-center mt-16 md:mt-20">
+        <img
+          src={resumeImg}
+          alt="Resume"
+          className="block mx-auto w-80 md:w-96 max-w-full rounded-xl shadow-2xl object-contain"
+        />
       </div>
 
       {/* Features */}
@@ -111,14 +115,14 @@ export default function Landing() {
         <div>
           <h3 className="text-xl font-bold mb-2">Live scraping.</h3>
           <p className="text-gray-400">
-            Direct from Internshala, always fresh.
+            Direct from Internshala and LinkedIn, always fresh.
           </p>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="text-center py-4 text-gray-500 text-sm">
-        Made by Ruchin & Shriya <span className="ml-1">👏</span>
+    {/* Footer intentionally removed per request */}
       </footer>
     </div>
   );
