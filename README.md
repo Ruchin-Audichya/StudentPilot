@@ -1,73 +1,121 @@
-# Welcome to your Lovable project
+<div align="center">
 
-## Project info
+# StudentPilot
 
-**URL**: https://lovable.dev/projects/450c8bbc-7234-4615-87d4-a9710b5dfad1
+Find internships that actually match your skills. Upload your resume, search with your interests, and chat with an AI career copilot — all in a sleek glassmorphism UI.
 
-## How can I edit this code?
+<br/>
 
-There are several ways of editing your application.
+![Hero](./src/assets/hero-nexus.jpg)
 
-**Use Lovable**
+</div>
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/450c8bbc-7234-4615-87d4-a9710b5dfad1) and start prompting.
+## ✨ Features
 
-Changes made via Lovable will be committed automatically to this repo.
+- Resume-aware search: upload a PDF/DOCX/TXT and we extract key skills automatically.
+- Internship finder powered by Internshala scraping with graceful fallbacks.
+- B.Tech buzzwords CSV to bias searches toward relevant student roles (editable).
+- Career chatbot using Google Gemini (1.5 Flash) for fast, helpful answers.
+- Modern UI: Tailwind + shadcn-ui + glassmorphism, rounded, responsive.
 
-**Use your preferred IDE**
+## 🧭 Architecture
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Frontend: React + Vite + TypeScript + Tailwind/shadcn.
+- Backend: FastAPI + Uvicorn, simple scraping + keyword extraction.
+- AI: Google Gemini via google-generativeai SDK.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```
+src/                 # React app (UI, services)
+backend/             # FastAPI server
+	scrapers/          # Internshala scraper
+	data/btech_buzzwords.csv  # CSV of B.Tech job buzzwords
+```
 
-Follow these steps:
+## 🚀 Getting started
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 1) Prerequisites
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- Node.js 18+ and npm
+- Python 3.11+
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 2) Clone
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+git clone https://github.com/Ruchin-Audichya/StudentPilot.git
+cd StudentPilot
+```
+
+### 3) Environment variables
+
+Copy the example and fill in your Gemini API key:
+
+```bash
+cp .env.example .env
+```
+
+Variables
+- GOOGLE_API_KEY: Google Gemini API key for chatbot.
+- PORT: Backend port (default 8000).
+- VITE_API_BASE: Frontend API base (default http://127.0.0.1:8000).
+
+### 4) Install & run
+
+Backend (FastAPI):
+
+```bash
+python -m venv .venv
+. .venv/Scripts/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+python backend/main.py
+```
+
+Frontend (Vite):
+
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+- App: http://127.0.0.1:8080
+- API: http://127.0.0.1:8000
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🔌 API quick reference
 
-**Use GitHub Codespaces**
+POST /api/upload-resume
+- Body: multipart/form-data, field file(.pdf/.docx/.txt)
+- Use: sets resume context for search/chat
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+POST /api/search
+- Body: { query: string, filters: { location?: string, experience_level?: string } }
+- Behavior: Uses query first; if empty/no results, falls back to resume keywords (incl. B.Tech buzzwords)
 
-## What technologies are used for this project?
+POST /api/chat
+- Body: { message: string }
+- Returns concise, actionable answers using Gemini with your resume as context
 
-This project is built with:
+## 🧠 B.Tech buzzwords
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+CSV: `backend/data/btech_buzzwords.csv`
+- Format: `Job_Title,Required_Skills`
+- You can edit or replace this file to tune search weightings for student roles.
 
-## How can I deploy this project?
+## 🖌️ UI notes
 
-Simply open [Lovable](https://lovable.dev/projects/450c8bbc-7234-4615-87d4-a9710b5dfad1) and click on Share -> Publish.
+- Glass cards via `.glass-card` class in `src/index.css`.
+- Rounded, gradient buttons: `gradient-primary`, `gradient-success`, etc.
 
-## Can I connect a custom domain to my Lovable project?
+## 🤝 Contributors
 
-Yes, you can!
+- Ruchin Audichya — core dev and product
+- Shriya Gakkhar — UI/UX and product shaping
+	- GitHub: https://github.com/shriya-gakkhar1
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+If you find this useful, star the repo and share feedback!
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🔐 Security
+
+Do not commit secrets. `.env` is git-ignored. Use `.env.example` as a guide.
+
+## 📄 License
+
+This project is provided as-is for learning and prototyping. Choose a license when you’re ready to open-source or distribute.
