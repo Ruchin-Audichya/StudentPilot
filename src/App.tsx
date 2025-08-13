@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // Pages & Components
-import Index from "@/pages/Index";
+import Landing from "@/pages/Landing";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
@@ -10,8 +10,8 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* Landing page */}
-        <Route path="/" element={<Index />} />
+  {/* Landing page */}
+  <Route path="/" element={<Landing />} />
 
         {/* Onboarding flow */}
         <Route path="/onboarding" element={<Onboarding />} />

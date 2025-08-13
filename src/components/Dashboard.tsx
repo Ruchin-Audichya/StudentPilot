@@ -11,12 +11,16 @@ interface StudentProfile {
 }
 
 type DashboardProps = {
-  profile: StudentProfile;
+  profile?: StudentProfile;
 };
 
 export default function Dashboard({ profile }: DashboardProps) {
-  const [skills, setSkills] = useState<string[]>(profile.skills || []);
-  const [interests, setInterests] = useState<string[]>(profile.interests || []);
+  const stored = (() => {
+    try { return JSON.parse(localStorage.getItem("onboarding") || "null") as StudentProfile | null; } catch { return null; }
+  })();
+  const effective = profile || stored || { name: "Friend", skills: [], interests: [] };
+  const [skills, setSkills] = useState<string[]>(effective.skills || []);
+  const [interests, setInterests] = useState<string[]>(effective.interests || []);
   const [location, setLocation] = useState<string>("India");
   const [results, setResults] = useState<JobResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,7 +36,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [chatMessages, setChatMessages] = useState<{ role: string; text: string }[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
 
-  const firstName = useMemo(() => (profile?.name || "").split(" ")[0] || "there", [profile?.name]);
+  const firstName = useMemo(() => (effective?.name || "").split(" ")[0] || "there", [effective?.name]);
 
   async function handleSearch() {
     setLoading(true);

@@ -1,22 +1,63 @@
 import os
 import io
-import fitz  # PyMuPDF
-import docx
-import google.generativeai as genai
-from fastapi import FastAPI, File, UploadFile, Header, HTTPException, Depends
+import csv
+from typing import List, Optional
+
+from fastapi import FastAPI, File, UploadFile, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
-import firebase_admin
-from firebase_admin import credentials, auth
 
+# Optional imports with graceful fallbacks
+try:
+    import fitz  # PyMuPDF
+    FITZ_AVAILABLE = True
+except Exception:
+    fitz = None  # type: ignore
+    FITZ_AVAILABLE = False
 
-from scrapers.internshala import fetch_internships
-from scrapers.linkedin import fetch_linkedin_internships
+try:
+    import docx  # python-docx
+    DOCX_AVAILABLE = True
+except Exception:
+    docx = None  # type: ignore
+    DOCX_AVAILABLE = False
+
+import logging
+import google.generativeai as genai
+
+# Feature flags
+ENABLE_LINKEDIN = os.getenv("ENABLE_LINKEDIN", "true").lower() == "true"
+REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "false").lower() == "true"
+
+# Firebase is optional; enable only if sdk file exists and package is available
+AUTH_ENABLED = False
+auth = None
+try:
+    import firebase_admin  # type: ignore
+    from firebase_admin import credentials, auth as fb_auth  # type: ignore
+    if os.path.exists("firebase-adminsdk.json"):
+        cred = credentials.Certificate("firebase-adminsdk.json")
+        firebase_admin.initialize_app(cred)
+        auth = fb_auth
+        AUTH_ENABLED = True
+except Exception as e:
+    logging.warning(f"Firebase not enabled: {e}")
+    AUTH_ENABLED = False
+    auth = None
 
 from dotenv import load_dotenv
-import csv
+
+# Scrapers
+from scrapers.internshala import fetch_internships
+try:
+    from scrapers.linkedin import fetch_linkedin_internships  # requires selenium/webdriver-manager
+except Exception as e:
+    logging.warning(f"LinkedIn scraper import failed: {e}")
+    ENABLE_LINKEDIN = False
+    def fetch_linkedin_internships(query: str, location: Optional[str] = None, limit: int = 12):  # type: ignore
+        return []
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
@@ -25,12 +66,6 @@ if not GOOGLE_API_KEY:
 genai.configure(api_key=GOOGLE_API_KEY)
 
 app = FastAPI()
-
-
-# Initialize Firebase Admin SDK
-
-cred = credentials.Certificate("firebase-adminsdk.json")
-firebase_admin.initialize_app(cred)
 
 
 # Allow CORS for frontend
@@ -134,8 +169,17 @@ def search_internships(req: SearchRequest):
     q = (req.query or "").strip()
 
     # First attempt: user query
-    internshala_results = fetch_internships(q or "intern", location=location)
-    linkedin_results = fetch_linkedin_internships(q or "intern", location=location)
+    internshala_results = []
+    linkedin_results = []
+    try:
+        internshala_results = fetch_internships(q or "intern", location=location)
+    except Exception as e:
+        logging.warning(f"Internshala scraper error: {e}")
+    if ENABLE_LINKEDIN:
+        try:
+            linkedin_results = fetch_linkedin_internships(q or "intern", location=location)
+        except Exception as e:
+            logging.warning(f"LinkedIn scraper error: {e}")
 
     # Combine results
     scraped = internshala_results + linkedin_results
@@ -169,35 +213,61 @@ async def upload_resume(file: UploadFile = File(...)):
     global resume_text_store
     content = await file.read()
     text = ""
-    if file.filename.lower().endswith(".pdf"):
-        with fitz.open(stream=content, filetype="pdf") as pdf_doc:
-            for page in pdf_doc:
-                text += page.get_text()
-    elif file.filename.lower().endswith(".docx"):
-        doc = docx.Document(io.BytesIO(content))
-        for para in doc.paragraphs:
-            text += para.text + "\n"
-    elif file.filename.lower().endswith(".txt"):
-        text = content.decode("utf-8", errors="ignore")
-    else:
-        return {"error": "Unsupported file format"}
+    fname = (file.filename or "").lower()
+    try:
+        if fname.endswith(".pdf"):
+            if FITZ_AVAILABLE:
+                with fitz.open(stream=content, filetype="pdf") as pdf_doc:  # type: ignore
+                    for page in pdf_doc:
+                        text += page.get_text()
+            else:
+                return {"error": "PDF parsing requires PyMuPDF. Please install PyMuPDF or upload DOCX/TXT."}
+        elif fname.endswith(".docx"):
+            if DOCX_AVAILABLE:
+                d = docx.Document(io.BytesIO(content))  # type: ignore
+                for para in d.paragraphs:
+                    text += para.text + "\n"
+            else:
+                return {"error": "DOCX parsing requires python-docx. Please install python-docx or upload PDF/TXT."}
+        elif fname.endswith(".txt"):
+            text = content.decode("utf-8", errors="ignore")
+        else:
+            return {"error": "Unsupported file format. Use PDF, DOCX, or TXT."}
+    except Exception as e:
+        return {"error": f"Failed to parse resume: {e}"}
     resume_text_store = text.strip()
     return {"message": "Resume uploaded successfully", "chars": len(resume_text_store)}
 
 @app.post("/api/chat")
-def chat_with_ai(req: ChatRequest):
+def chat_with_ai(req: ChatRequest, id_token: Optional[str] = Header(default=None)):
+    # Optional/required auth based on flags
+    if REQUIRE_AUTH:
+        if not (AUTH_ENABLED and id_token):
+            raise HTTPException(status_code=401, detail="Authentication required")
+        try:
+            assert auth is not None
+            auth.verify_id_token(id_token)
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Invalid authentication credentials: {e}")
+    else:
+        if AUTH_ENABLED and id_token:
+            try:
+                assert auth is not None
+                auth.verify_id_token(id_token)
+            except Exception as e:
+                logging.warning(f"Auth header provided but invalid: {e}")
+
     context = (
         "You are a helpful career assistant. Use the user's resume only for context. "
         "Answer internship/job related queries concisely with actionable steps."
     )
     prompt = f"{context}\n\nResume (optional):\n{resume_text_store[:4000]}\n\nUser: {req.message}"
     try:
-        # Gemini models: prefer 1.5 flash for speed; fall back to 1.5 pro if needed
+        # Gemini models: prefer 1.5 flash for speed
         model = genai.GenerativeModel("gemini-1.5-flash")
         resp = model.generate_content(prompt)
         text = getattr(resp, "text", None)
         if not text:
-            # Some SDKs return candidates
             cands = getattr(resp, "candidates", [])
             if cands and getattr(cands[0], "content", None):
                 parts = getattr(cands[0].content, "parts", [])
@@ -206,39 +276,6 @@ def chat_with_ai(req: ChatRequest):
     except Exception as e:
         return {"response": f"AI error: {str(e)}"}
 
-
-# Auth logic
-# main.py
-# Define the authentication dependency
-async def get_current_user(id_token: str = Header(...)):
-    try:
-        # Verify the ID token using the Firebase Admin SDK
-        decoded_token = auth.verify_id_token(id_token)
-        return decoded_token
-    except Exception as e:
-        # If verification fails, raise an HTTPException
-        raise HTTPException(status_code=401, detail=f"Invalid authentication credentials: {e}")
-@app.post("/api/chat")
-def chat_with_ai(req: ChatRequest, current_user: dict = Depends(get_current_user)):
-    # You can now access the user's information from the decoded token
-    user_uid = current_user.get('uid')
-    user_email = current_user.get('email')
-    
-    # Your existing chat logic
-    context = (
-        "You are a helpful career assistant. Use the user's resume only for context. "
-        "Answer internship/job related queries concisely with actionable steps."
-    )
-    prompt = f"{context}\n\nResume (optional):\n{resume_text_store[:4000]}\n\nUser: {req.message}"
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resp = model.generate_content(prompt)
-        # ... (rest of the code)
-        return {"response": "Sorry, I couldn't generate a response right now."}
-    except Exception as e:
-        return {"response": f"AI error: {str(e)}"}
-
-# Initialize Firebase Admin SDK
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))

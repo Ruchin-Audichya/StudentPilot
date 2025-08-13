@@ -1,7 +1,10 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-pdfminer.six
 python-docx
-httpx
 google-generativeai
+beautifulsoup4
+requests
+PyMuPDF
+selenium
+webdriver-manager

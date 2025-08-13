@@ -119,3 +119,14 @@ Do not commit secrets. `.env` is git-ignored. Use `.env.example` as a guide.
 ## 📄 License
 
 This project is provided as-is for learning and prototyping. Choose a license when you’re ready to open-source or distribute.
+
+---
+
+## What changed recently
+
+- New Landing page at `/` with responsive navbar; buttons navigate to `/onboarding` via SPA.
+- Routing updated in `src/App.tsx`; previous index flow kept inside `src/pages/Index.tsx` (exported as OldIndex in code).
+- ResumeUploader enhanced: optional Firebase Storage upload (anonymous auth) while still sending file to backend for parsing.
+- Backend hardening: optional Firebase Admin and LinkedIn scraper via env flags; duplicate `/api/chat` removed.
+- LinkedIn scraper dependencies added (selenium, webdriver-manager); Internshala remains default.
+- Buzzwords CSV loaded at startup; search falls back to resume keywords.

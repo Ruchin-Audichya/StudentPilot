@@ -11,7 +11,7 @@ interface StudentProfile {
 }
 
 type OnboardingProps = {
-  onComplete: (profile: StudentProfile) => void;
+  onComplete?: (profile: StudentProfile) => void;
 };
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
@@ -32,7 +32,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       year: "",
     };
     localStorage.setItem("onboarding", JSON.stringify(profile));
-    onComplete(profile);
+    if (onComplete) {
+      onComplete(profile);
+    }
+    // Navigate to dashboard in route-based usage
+    try { navigate("/dashboard"); } catch {}
   }
 
   return (

@@ -19,6 +19,7 @@ Thumbs.db
 # Env & secrets
 .env
 backend/.env
+backend/firebase-adminsdk.json
 
 # Logs
 *.log
