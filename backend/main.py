@@ -234,7 +234,7 @@ def chat_with_ai(req: ChatRequest, current_user: dict = Depends(get_current_user
         model = genai.GenerativeModel("gemini-1.5-flash")
         resp = model.generate_content(prompt)
         # ... (rest of the code)
-        return {"response": text or "Sorry, I couldn't generate a response right now."}
+        return {"response": "Sorry, I couldn't generate a response right now."}
     except Exception as e:
         return {"response": f"AI error: {str(e)}"}
 
