@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FIREBASE_READY, signUpWithEmailPassword, saveUserProfile } from "@/lib/firebase";
+import { FIREBASE_READY, FIREBASE_ENABLED, signUpWithEmailPassword, saveUserProfile } from "@/lib/firebase";
 
 interface StudentProfile {
   name: string;
@@ -73,7 +73,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         <p className="text-sm text-muted-foreground mb-6">Fill your details to personalize recommendations.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {FIREBASE_READY && (
+          {FIREBASE_ENABLED && !FIREBASE_READY && (
+            <div className="text-xs p-3 rounded-xl border border-yellow-400/30 bg-yellow-500/10 text-yellow-200">
+              Firebase is enabled but missing config. Email/password signup is hidden until VITE_FIREBASE_* are set.
+            </div>
+          )}
+    {FIREBASE_ENABLED && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold mb-1">Email</label>
@@ -81,7 +86,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required={FIREBASE_READY}
+      required={FIREBASE_READY}
+      disabled={!FIREBASE_READY}
                   className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="you@example.com"
                 />
@@ -92,7 +98,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required={FIREBASE_READY}
+      required={FIREBASE_READY}
+      disabled={!FIREBASE_READY}
                   className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="••••••••"
                 />

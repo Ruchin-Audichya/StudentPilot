@@ -38,6 +38,7 @@ let storage: FirebaseStorage | null = null;
 let db: Firestore | null = null;
 
 export const FIREBASE_READY = enabled && hasConfig(config);
+export const FIREBASE_ENABLED = enabled;
 
 if (FIREBASE_READY) {
   app = initializeApp(config);
