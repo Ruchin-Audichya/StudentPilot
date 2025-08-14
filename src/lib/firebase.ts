@@ -1,7 +1,7 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAuth, type Auth as FirebaseAuth } from "firebase/auth";
+// Note: import analytics dynamically only when config is valid to avoid runtime errors
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function trimOrEmpty(v: unknown): string {
@@ -58,24 +58,36 @@ assertConfig(firebaseConfig);
 
 const app: FirebaseApp = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
 
-// Export Auth for use in AuthPage
-export const auth = getAuth(app);
-
 // Lightweight readiness flag: only true when required fields present
 export const FIREBASE_READY = Boolean(
   firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId
 );
 
-// Try to init Analytics only when supported and configured (no errors if unsupported)
-(async () => {
-  try {
-    if (firebaseConfig.measurementId && (await isSupported())) {
-      getAnalytics(app);
-    }
-  } catch {
-    /* no-op */
+// Export Auth for use in AuthPage
+// Avoid initializing Auth when config is incomplete to prevent runtime crashes
+export const auth: FirebaseAuth | null = FIREBASE_READY ? getAuth(app) : (null as unknown as FirebaseAuth);
+
+// Optional helper for guarded access
+export function getAuthOrThrow(): FirebaseAuth {
+  if (!FIREBASE_READY) {
+    throw new Error("Firebase not configured. Set VITE_FIREBASE_* envs and redeploy.");
   }
-})();
+  return getAuth(app);
+}
+
+// Initialize Analytics only when FIREBASE_READY to avoid auth/invalid-api-key crashes
+if (FIREBASE_READY && firebaseConfig.measurementId) {
+  (async () => {
+    try {
+      const analyticsMod = await import("firebase/analytics");
+      if (analyticsMod && (await analyticsMod.isSupported())) {
+        analyticsMod.getAnalytics(app);
+      }
+    } catch {
+      /* no-op */
+    }
+  })();
+}
 
 // Optional: upload file to Firebase Storage and return a public URL
 export async function uploadToStorage(file: File): Promise<string> {
