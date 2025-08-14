@@ -93,8 +93,20 @@ export async function ensureAnonymousUser(): Promise<User | null> {
   if (!FIREBASE_READY) return null;
   const a = getAuthOrThrow();
   if (!a.currentUser) {
-    const cred = await signInAnonymously(a);
-    return cred.user;
+    try {
+      const cred = await signInAnonymously(a);
+      return cred.user;
+    } catch (e: any) {
+      const code = e?.code || "";
+      if (code === "auth/operation-not-allowed") {
+        // eslint-disable-next-line no-console
+        console.warn("Anonymous auth is disabled. Enable Authentication > Sign-in method > Anonymous in Firebase Console.");
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn("Anonymous sign-in failed:", e);
+      }
+      return null;
+    }
   }
   return a.currentUser;
 }
