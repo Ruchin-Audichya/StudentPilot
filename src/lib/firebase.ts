@@ -1,8 +1,17 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth as FirebaseAuth } from "firebase/auth";
+import {
+  getAuth,
+  type Auth as FirebaseAuth,
+  signInAnonymously,
+  type User,
+} from "firebase/auth";
 // Note: import analytics dynamically only when config is valid to avoid runtime errors
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import {
+  getFirestore,
+  type Firestore,
+} from "firebase/firestore";
 
 function trimOrEmpty(v: unknown): string {
   return (typeof v === "string" ? v.trim() : "");
@@ -73,6 +82,21 @@ export function getAuthOrThrow(): FirebaseAuth {
     throw new Error("Firebase not configured. Set VITE_FIREBASE_* envs and redeploy.");
   }
   return getAuth(app);
+}
+
+// Firestore instance export (guarded by FIREBASE_READY)
+export const db: Firestore | null = FIREBASE_READY ? getFirestore(app) : (null as unknown as Firestore);
+
+// Ensure there's an authenticated user; if no user, sign in anonymously.
+// Returns the current user (anonymous or permanent). Safe no-op if Firebase isn't configured.
+export async function ensureAnonymousUser(): Promise<User | null> {
+  if (!FIREBASE_READY) return null;
+  const a = getAuthOrThrow();
+  if (!a.currentUser) {
+    const cred = await signInAnonymously(a);
+    return cred.user;
+  }
+  return a.currentUser;
 }
 
 // Initialize Analytics only when FIREBASE_READY to avoid auth/invalid-api-key crashes

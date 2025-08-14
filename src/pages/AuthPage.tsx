@@ -3,6 +3,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "fire
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { auth } from "@/lib/firebase"; // ✅ use your firebase.ts export
+import { linkAnonymousAccount } from "@/services/onboardingService";
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -16,9 +17,30 @@ export default function AuthPage() {
     try {
       let userCredential;
       if (isSignUp) {
-        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Try linking current (possibly anonymous) user to email/password
+        try {
+          const linked = await linkAnonymousAccount(email, password);
+          if (linked) {
+            userCredential = { user: linked } as any;
+          } else {
+            userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          }
+        } catch (linkErr) {
+          // Fallback to create user if linking failed (e.g., no anon user)
+          userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        }
       } else {
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // If already anonymous, try linking to this email/password
+        try {
+          const linked = await linkAnonymousAccount(email, password);
+          if (linked) {
+            userCredential = { user: linked } as any;
+          } else {
+            userCredential = await signInWithEmailAndPassword(auth, email, password);
+          }
+        } catch (linkErr) {
+          userCredential = await signInWithEmailAndPassword(auth, email, password);
+        }
       }
       Cookies.set("user", userCredential.user.uid, { expires: 7 });
       navigate("/onboarding");

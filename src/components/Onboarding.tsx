@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { startOnboarding, saveOnboardingData, type OnboardingPayload } from "@/services/onboardingService";
 
 interface StudentProfile {
   name: string;
@@ -25,7 +26,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const profile: StudentProfile = {
+  const profile: StudentProfile = {
       name,
       skills: skills
         .split(",")
@@ -42,12 +43,34 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     };
     localStorage.setItem("onboarding", JSON.stringify(profile));
     onComplete?.(profile);
-    try {
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Navigation failed:", error);
-    }
+    // Persist to Firestore with anonymous UID
+    const payload: OnboardingPayload = {
+      name: profile.name,
+      college: profile.college,
+      branch: profile.branch,
+      year: profile.year,
+      skills: profile.skills,
+      interests: profile.interests,
+      location: profile.location,
+    };
+    saveOnboardingData(payload)
+      .catch((err) => console.warn("Failed to save onboarding data:", err))
+      .finally(() => {
+        try {
+          navigate("/dashboard");
+        } catch (error) {
+          console.error("Navigation failed:", error);
+        }
+      });
   }
+
+  // Ensure anonymous user session exists when page loads
+  useEffect(() => {
+    startOnboarding().catch((e) => {
+      // non-fatal; onboarding can proceed locally
+      console.warn("Anonymous sign-in failed (non-blocking):", e);
+    });
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
