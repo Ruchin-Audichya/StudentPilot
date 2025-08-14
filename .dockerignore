@@ -1,0 +1,12 @@
+node_modules
+.dist
+.vite
+.git
+.gitignore
+Dockerfile
+backend/Dockerfile
+backend/__pycache__
+**/__pycache__
+*.pyc
+.vscode
+.DS_Store

@@ -105,6 +105,29 @@ npm run build; npm run preview
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
+## 🐳 Docker (optional)
+
+Build and run both services locally with Docker Compose:
+
+```powershell
+docker compose up --build
+```
+
+- Frontend: http://127.0.0.1:5173
+- API: http://127.0.0.1:8011
+
+Or build separately:
+
+```powershell
+# Backend API
+docker build -t studentpilot-api ./backend
+docker run -p 8011:8000 --env-file backend/.env studentpilot-api
+
+# Frontend static
+docker build -t studentpilot-web .
+docker run -p 5173:80 studentpilot-web
+```
+
 ### Optional: Enable Firebase (email/password signup + Storage)
 
 1) In `.env` set:
