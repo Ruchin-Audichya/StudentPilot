@@ -8,6 +8,7 @@ interface StudentProfile {
   year?: string;
   skills: string[];
   interests: string[];
+  location?: string;
 }
 
 type OnboardingProps = {
@@ -25,17 +26,21 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     e.preventDefault();
     const profile: StudentProfile = {
       name,
-      skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
-      interests: interests.split(",").map((s) => s.trim()).filter(Boolean),
+      skills: skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      interests: interests
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
       college: "",
       branch: "",
       year: "",
+      location,
     };
     localStorage.setItem("onboarding", JSON.stringify(profile));
-    if (onComplete) {
-      onComplete(profile);
-    }
-    // Navigate to dashboard in route-based usage
+    onComplete?.(profile);
     try {
       navigate("/dashboard");
     } catch (error) {
@@ -46,8 +51,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-xl w-full glass-card rounded-2xl p-8">
-        <h1 className="text-2xl md:text-3xl font-extrabold mb-2">Welcome! </h1>
-        <p className="text-sm text-muted-foreground mb-6">Fill your details to personalize recommendations.</p>
+        <h1 className="text-2xl md:text-3xl font-extrabold mb-2">Welcome!</h1>
+        <p className="text-sm text-muted-foreground mb-6">
+          Fill your details to personalize recommendations.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -63,7 +70,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1">Skills (comma separated)</label>
+            <label className="block text-sm font-semibold mb-1">
+              Skills (comma separated)
+            </label>
             <input
               type="text"
               value={skills}
@@ -74,7 +83,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1">Interests (comma separated)</label>
+            <label className="block text-sm font-semibold mb-1">
+              Interests (comma separated)
+            </label>
             <input
               type="text"
               value={interests}
@@ -85,7 +96,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-1">Preferred Location</label>
+            <label className="block text-sm font-semibold mb-1">
+              Preferred Location
+            </label>
             <input
               type="text"
               value={location}
@@ -94,7 +107,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               placeholder="India, Remote, New Delhi"
             />
           </div>
-            {/*w-full rounded-full px-5 py-2 gradient-success text-white shadow-md hover:opacity-95 transition*/}
+
           <button
             type="submit"
             className="w-full mt-2 bg-white text-black py-2 rounded-lg font-semibold hover:bg-gray-200 transition"
@@ -103,11 +116,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </button>
         </form>
       </div>
-<<<<<<< HEAD
-    </div>
-  );
-=======
     </div>
   );
->>>>>>> 46569f9994336f70253926cfabea35d32c6aff47
 }

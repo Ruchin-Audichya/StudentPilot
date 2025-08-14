@@ -1,20 +1,8 @@
 import { useState } from "react";
-<<<<<<< HEAD
-
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-
-import { useNavigate } from "react-router-dom";
-
-import Cookies from "js-cookie";
-
-import { auth } from "@/lib/firebase"; // ✅ use your firebase.ts export
-=======
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { auth } from "@/lib/firebase"; // ✅ use your firebase.ts export
-
->>>>>>> 46569f9994336f70253926cfabea35d32c6aff47
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -40,7 +28,6 @@ export default function AuthPage() {
   };
 
   return (
-<<<<<<< HEAD
     <div className="bg-black text-white min-h-screen flex items-center justify-center">
       {/* Card container */}
       <div className="bg-[#0d0d0d] border border-gray-800 rounded-xl shadow-lg w-full max-w-sm p-8">
@@ -103,46 +90,6 @@ export default function AuthPage() {
           Firebase authentication handled internally.
         </p>
       </div>
-=======
-    <div className="bg-black text-white min-h-screen flex flex-col items-center justify-center">
-      <h1 className="text-3xl font-bold mb-6">{isSignUp ? "Create an Account" : "Welcome Back"}</h1>
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => setIsSignUp(false)}
-          className={`px-4 py-2 rounded-full ${!isSignUp ? "bg-white text-black" : "border border-white"}`}
-        >
-          Sign In
-        </button>
-        <button
-          onClick={() => setIsSignUp(true)}
-          className={`px-4 py-2 rounded-full ${isSignUp ? "bg-white text-black" : "border border-white"}`}
-        >
-          Sign Up
-        </button>
-      </div>
-      <form onSubmit={handleAuth} className="flex flex-col gap-4 w-80">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="px-4 py-2 rounded text-black"
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="px-4 py-2 rounded text-black"
-          required
-        />
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button type="submit" className="bg-white text-black px-4 py-2 rounded-full font-semibold">
-          {isSignUp ? "Sign Up" : "Sign In"}
-        </button>
-      </form>
->>>>>>> 46569f9994336f70253926cfabea35d32c6aff47
     </div>
   );
 }

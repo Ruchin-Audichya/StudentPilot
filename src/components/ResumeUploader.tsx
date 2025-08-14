@@ -24,7 +24,7 @@ export default function ResumeUploader({ onUploaded }: Props) {
 
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch((import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000") + "/api/upload-resume", {
+  const res = await fetch((import.meta.env.VITE_API_BASE || "http://127.0.0.1:8011") + "/api/upload-resume", {
       method: "POST",
       body: form,
     });

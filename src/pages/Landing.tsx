@@ -77,7 +77,7 @@ export default function Landing() {
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link
-            to="/onboarding"
+            to="/auth"
             className="bg-white text-black px-6 py-3 rounded-full font-semibold"
           >
             Find My Stipend
@@ -118,11 +118,6 @@ export default function Landing() {
       <footer className="text-center py-4 text-gray-500 text-sm">
         {/* Footer intentionally removed per request */}
       </footer>
-<<<<<<< HEAD
-    </div>
-  );
-=======
-    </div>
-  );
->>>>>>> 46569f9994336f70253926cfabea35d32c6aff47
+      </div>
+    );
 }
