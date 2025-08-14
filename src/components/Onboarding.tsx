@@ -43,7 +43,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     };
     localStorage.setItem("onboarding", JSON.stringify(profile));
     onComplete?.(profile);
-    // Persist to Firestore with anonymous UID
+    // Navigate immediately so UX is snappy
+    try {
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Navigation failed:", error);
+    }
+    // Persist to Firestore with anonymous UID in background (non-blocking)
     const payload: OnboardingPayload = {
       name: profile.name,
       college: profile.college,
@@ -53,15 +59,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       interests: profile.interests,
       location: profile.location,
     };
-    saveOnboardingData(payload)
-      .catch((err) => console.warn("Failed to save onboarding data:", err))
-      .finally(() => {
-        try {
-          navigate("/dashboard");
-        } catch (error) {
-          console.error("Navigation failed:", error);
-        }
-      });
+    saveOnboardingData(payload).catch((err) => console.warn("Failed to save onboarding data:", err));
   }
 
   // Ensure anonymous user session exists when page loads
