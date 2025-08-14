@@ -39,7 +39,7 @@ export default function AuthPage() {
         <div className="flex justify-center gap-2 mb-6">
           <button
             onClick={() => setIsSignUp(false)}
-            className={`px-6 py-2 rounded-t-lg font-semibold ${
+            className={`px-6 py-2 rounded-lg font-semibold ${
               !isSignUp ? "bg-white text-black" : "bg-gray-900 text-white"
             }`}
           >
@@ -47,7 +47,7 @@ export default function AuthPage() {
           </button>
           <button
             onClick={() => setIsSignUp(true)}
-            className={`px-6 py-2 rounded-t-lg font-semibold ${
+            className={`px-6 py-2 rounded-lg font-semibold ${
               isSignUp ? "bg-white text-black" : "bg-gray-900 text-white"
             }`}
           >

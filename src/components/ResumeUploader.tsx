@@ -47,9 +47,9 @@ export default function ResumeUploader({ onUploaded }: Props) {
           disabled={uploading}
         />
         {uploading ? (
-          <span className="text-sm text-blue-600">Uploading…</span>
+          <span className="text-sm text-grey-600">Uploading…</span>
         ) : uploaded ? (
-          <a href={uploaded} target="_blank" rel="noreferrer" className="text-sm text-green-600 underline">Uploaded • Replace</a>
+          <a href={uploaded} target="_blank" rel="noreferrer" className="text-sm text-grey-600 underline">Uploaded • Replace</a>
         ) : null}
       </div>
     </div>
