@@ -5,6 +5,7 @@ import Landing from "@/pages/Landing";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
+import AuthPage from "./pages/AuthPage";
 
 export default function App() {
   return (
@@ -21,6 +22,9 @@ export default function App() {
 
         {/* Logout page */}
         <Route path="/logout" element={<Logout />} />
+
+        {/* Auth page */}
+        <Route path="/auth" element={<AuthPage />} />
       </Routes>
     </Router>
   );

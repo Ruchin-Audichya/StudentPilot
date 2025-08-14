@@ -36,13 +36,17 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       onComplete(profile);
     }
     // Navigate to dashboard in route-based usage
-    try { navigate("/dashboard"); } catch {}
+    try {
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Navigation failed:", error);
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-xl w-full glass-card rounded-2xl p-8">
-        <h1 className="text-2xl md:text-3xl font-extrabold mb-2">Welcome! 👋</h1>
+        <h1 className="text-2xl md:text-3xl font-extrabold mb-2">Welcome! </h1>
         <p className="text-sm text-muted-foreground mb-6">Fill your details to personalize recommendations.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,15 +94,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               placeholder="India, Remote, New Delhi"
             />
           </div>
-
+            {/*w-full rounded-full px-5 py-2 gradient-success text-white shadow-md hover:opacity-95 transition*/}
           <button
             type="submit"
-            className="w-full rounded-full px-5 py-2 gradient-success text-white shadow-md hover:opacity-95 transition"
+            className="w-full mt-2 bg-white text-black py-2 rounded-lg font-semibold hover:bg-gray-200 transition"
           >
             Continue to Dashboard
           </button>
         </form>
       </div>
-    </div>
-  );
+    </div>
+  );
 }

@@ -61,10 +61,10 @@ export default function Landing() {
             )}
           </div>
           <Link
-            to="/onboarding"
+            to="/auth"
             className="bg-white text-black px-4 py-2 rounded-full font-semibold"
           >
-            Find My Stipend
+            Sign In
           </Link>
         </div>
       </nav>
@@ -81,12 +81,6 @@ export default function Landing() {
             className="bg-white text-black px-6 py-3 rounded-full font-semibold"
           >
             Find My Stipend
-          </Link>
-          <Link
-            to="/onboarding"
-            className="border border-white px-6 py-3 rounded-full font-semibold hover:bg-white hover:text-black"
-          >
-            Sign Up
           </Link>
         </div>
       </section>
@@ -122,8 +116,8 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="text-center py-4 text-gray-500 text-sm">
-    {/* Footer intentionally removed per request */}
+        {/* Footer intentionally removed per request */}
       </footer>
-    </div>
-  );
+    </div>
+  );
 }
