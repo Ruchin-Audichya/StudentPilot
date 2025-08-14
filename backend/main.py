@@ -23,7 +23,11 @@ except Exception:
     DOCX_AVAILABLE = False
 
 import logging
+import re
+import time
 import google.generativeai as genai
+import requests
+from pathlib import Path
 
 # Feature flags
 ENABLE_LINKEDIN = os.getenv("ENABLE_LINKEDIN", "true").lower() == "true"
@@ -56,14 +60,30 @@ except Exception as e:
     ENABLE_LINKEDIN = False
     def fetch_linkedin_internships(query: str, location: Optional[str] = None, limit: int = 12):  # type: ignore
         return []
-load_dotenv()
+# Load env from repo root and backend folder (so placing .env at the root works)
+try:
+    root_env = Path(__file__).resolve().parents[1] / ".env"
+    backend_env = Path(__file__).resolve().parent / ".env"
+    # Load root first, then backend (backend can override)
+    load_dotenv(dotenv_path=root_env, override=False)
+    load_dotenv(dotenv_path=backend_env, override=False)
+except Exception:
+    load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise RuntimeError("GOOGLE_API_KEY not found in environment variables")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen3-coder:free")
+OPENROUTER_BASE = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions")
+OPENROUTER_REF = os.getenv("OPENROUTER_SITE_URL")
+OPENROUTER_TITLE = os.getenv("OPENROUTER_SITE_NAME")
+OPENROUTER_MODELS = [m.strip() for m in os.getenv("OPENROUTER_MODELS", OPENROUTER_MODEL).split(",") if m.strip()]
 
-genai.configure(api_key=GOOGLE_API_KEY)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not OPENROUTER_API_KEY and not GOOGLE_API_KEY:
+    raise RuntimeError("OPENROUTER_API_KEY or GOOGLE_API_KEY must be set in environment variables")
+
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
 
 app = FastAPI()
 
@@ -257,23 +277,184 @@ def chat_with_ai(req: ChatRequest, id_token: Optional[str] = Header(default=None
             except Exception as e:
                 logging.warning(f"Auth header provided but invalid: {e}")
 
+    # Determine intent from user message
+    msg_l = (req.message or "").lower()
+    intent = "general"
+    if ("rate" in msg_l and "resume" in msg_l) or ("score" in msg_l and "resume" in msg_l):
+        intent = "rate_resume"
+    elif "skill gap" in msg_l or "skill-gap" in msg_l or "gap analysis" in msg_l:
+        intent = "skill_gap"
+
+    # Build a high-quality prompt with clear formatting instructions
     context = (
-        "You are a helpful career assistant. Use the user's resume only for context. "
-        "Answer internship/job related queries concisely with actionable steps."
+        "You are an expert AI career coach for students. You always answer with clear, concise bullet points "
+        "and short sentences. Use the user's resume purely as context if provided. Prefer specific, actionable advice.\n\n"
+        "Output rules:\n"
+        "- Start with a one-line summary.\n"
+        "- Use bullet points (\"-\") for steps, tips, lists.\n"
+        "- Use short section headers in ALL CAPS when helpful (e.g., SUMMARY, STRENGTHS, GAPS, NEXT STEPS).\n"
+        "- Keep to 8-12 bullets total unless asked for more.\n"
     )
-    prompt = f"{context}\n\nResume (optional):\n{resume_text_store[:4000]}\n\nUser: {req.message}"
+
+    resume_snippet = (resume_text_store or "")[:4000]
+
+    if intent == "rate_resume":
+        task = (
+            "RATE RESUME OUT OF 10. Consider clarity, impact, relevance, and keywords. "
+            "Return: a score like 'Score: 7/10' then bullets for STRENGTHS, IMPROVEMENTS, and NEXT STEPS."
+        )
+    elif intent == "skill_gap":
+        task = (
+            "SKILL GAP ANALYSIS from the resume. Bullets for MATCHED SKILLS, MISSING SKILLS, and LEARNING PLAN. "
+            "Be specific. If resume is missing, ask the user to upload it first."
+        )
+    else:
+        task = (
+            "Answer the user's question about internships, jobs, skills, or resume improvements. "
+            "Prioritize actionable steps."
+        )
+
     try:
-        # Gemini models: prefer 1.5 flash for speed
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resp = model.generate_content(prompt)
-        text = getattr(resp, "text", None)
-        if not text:
-            cands = getattr(resp, "candidates", [])
-            if cands and getattr(cands[0], "content", None):
-                parts = getattr(cands[0].content, "parts", [])
-                text = "".join(getattr(p, "text", "") for p in parts)
-        return {"response": text or "Sorry, I couldn't generate a response right now."}
+        # Prefer OpenRouter if available (read env per request)
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        openrouter_base = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions")
+        openrouter_ref = os.getenv("OPENROUTER_SITE_URL")
+        openrouter_title = os.getenv("OPENROUTER_SITE_NAME")
+
+        if openrouter_key:
+            logging.info("AI provider: OpenRouter")
+            logging.info(f"Trying OpenRouter models: {OPENROUTER_MODELS}")
+            # Build messages
+            messages = [{"role": "system", "content": context}]
+            if resume_snippet:
+                messages.append({"role": "system", "content": f"RESUME (optional):\n{resume_snippet}"})
+            messages.append({"role": "system", "content": f"TASK: {task}"})
+            messages.append({"role": "user", "content": req.message})
+
+            headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json",
+            }
+            if openrouter_ref:
+                headers["HTTP-Referer"] = openrouter_ref
+            if openrouter_title:
+                headers["X-Title"] = openrouter_title
+
+            # Try each configured model with retries
+            retries = 2
+            delay = 5
+            for model_name in OPENROUTER_MODELS:
+                logging.info(f"OpenRouter model candidate: {model_name}")
+                for attempt in range(retries + 1):
+                    r = requests.post(
+                        openrouter_base,
+                        headers=headers,
+                        json={
+                            "model": model_name,
+                            "messages": messages,
+                            "temperature": 0.5,
+                            "top_p": 0.9,
+                            "max_tokens": 700,
+                        },
+                        timeout=60,
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        text = (
+                            data.get("choices", [{}])[0]
+                            .get("message", {})
+                            .get("content", "")
+                        )
+                        if text:
+                            return {"response": text}
+                        break
+                    if r.status_code == 429 and attempt < retries:
+                        retry_after = r.headers.get("Retry-After")
+                        wait = int(retry_after) if retry_after and retry_after.isdigit() else delay
+                        wait = min(20, max(3, wait))
+                        logging.warning(
+                            f"OpenRouter 429 for '{model_name}'. Attempt {attempt+1}/{retries}. Waiting {wait}s..."
+                        )
+                        time.sleep(wait)
+                        continue
+                    # Other errors: log and try next model
+                    try:
+                        err = r.json()
+                    except Exception:
+                        err = {"error": r.text}
+                    logging.warning(f"OpenRouter error {r.status_code} for '{model_name}': {err}")
+                    break
+
+            # If all models failed or were rate-limited, return a friendly message
+            return {
+                "response": (
+                    "- SUMMARY: I’m getting rate-limited right now.\n"
+                    "- Please retry in 30–60 seconds.\n"
+                    "- TIP: Add more models in OPENROUTER_MODELS to reduce rate limits."
+                )
+            }
+
+        # Fallback to Gemini flash models if OpenRouter is not configured
+        logging.info("AI provider: Gemini (flash)")
+        gen_config = {
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 40,
+            "max_output_tokens": 700,
+        }
+        model_candidates = [
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+        ]
+
+        prompt = (
+            f"{context}\n\nRESUME (optional):\n{resume_snippet}\n\nTASK: {task}\n\nUSER: {req.message}\nASSISTANT:"
+        )
+
+        text = None
+        last_err: Exception | None = None
+        for m in model_candidates:
+            retries = 2
+            for attempt in range(retries + 1):
+                try:
+                    model = genai.GenerativeModel(m, generation_config=gen_config)
+                    resp = model.generate_content(prompt)
+                    text = getattr(resp, "text", None)
+                    if not text:
+                        cands = getattr(resp, "candidates", [])
+                        if cands and getattr(cands[0], "content", None):
+                            parts = getattr(cands[0].content, "parts", [])
+                            text = "".join(getattr(p, "text", "") for p in parts)
+                    if text:
+                        break
+                except Exception as e:
+                    last_err = e
+                    msg = str(e)
+                    if "429" in msg or "quota" in msg.lower() or "rate limit" in msg.lower():
+                        wait = 5
+                        msec = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)\s*\}", msg)
+                        if msec:
+                            try:
+                                wait = min(15, max(3, int(msec.group(1))))
+                            except Exception:
+                                wait = 5
+                        logging.warning(f"Model '{m}' rate-limited. Attempt {attempt+1}/{retries}. Waiting {wait}s...")
+                        time.sleep(wait)
+                        continue
+                    else:
+                        logging.warning(f"Gemini model '{m}' failed: {e}")
+                        break
+            if text:
+                break
+
+        if text:
+            return {"response": text}
+        if last_err:
+            return {"response": f"AI error: {last_err}"}
+        return {"response": "Sorry, I couldn't generate a response right now."}
     except Exception as e:
+        logging.exception("AI error")
         return {"response": f"AI error: {str(e)}"}
 
 if __name__ == "__main__":

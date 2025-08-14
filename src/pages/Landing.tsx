@@ -118,6 +118,11 @@ export default function Landing() {
       <footer className="text-center py-4 text-gray-500 text-sm">
         {/* Footer intentionally removed per request */}
       </footer>
+<<<<<<< HEAD
     </div>
   );
+=======
+    </div>
+  );
+>>>>>>> 46569f9994336f70253926cfabea35d32c6aff47
 }

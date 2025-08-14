@@ -1,17 +1,9 @@
 
-import type { UserProfile, SearchRequest } from "./types";
+import type { SearchRequest } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
 
-export async function saveProfile(profile: UserProfile) {
-  const res = await fetch(`${API_BASE}/api/profile`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(profile),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+// Note: profile persistence is handled locally/Firebase in the app; no backend /api/profile endpoint.
 
 export async function uploadResume(file: File) {
   const form = new FormData();

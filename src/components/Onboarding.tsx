@@ -103,6 +103,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </button>
         </form>
       </div>
+<<<<<<< HEAD
     </div>
   );
+=======
+    </div>
+  );
+>>>>>>> 46569f9994336f70253926cfabea35d32c6aff47
 }

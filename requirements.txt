@@ -1,10 +1,2 @@
-fastapi
-uvicorn
-python-multipart
-pydantic
-requests
-beautifulsoup4
-python-docx
-PyMuPDF
-google-generativeai
-python-dotenv
+# This file is intentionally minimal. Use backend/requirements.txt for server dependencies.
+# Kept for compatibility with some IDEs.

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
 
 interface StudentProfile {
@@ -78,9 +79,15 @@ export default function Dashboard({ profile }: DashboardProps) {
     setChatLoading(true);
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (token) headers["id_token"] = token;
+      } catch {}
+
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ message: userMsg.text }),
       });
       const data = await res.json();
@@ -91,6 +98,29 @@ export default function Dashboard({ profile }: DashboardProps) {
     } finally {
       setChatLoading(false);
     }
+  }
+
+  function renderFormatted(text: string) {
+    // Basic bullet rendering: lines starting with '-' become list items
+    const blocks = text.split(/\n\n+/);
+    return (
+      <div className="space-y-2">
+        {blocks.map((block, i) => {
+          const lines = block.split(/\n/);
+          const isList = lines.every(l => l.trim().startsWith("-") || l.trim() === "");
+          if (isList) {
+            return (
+              <ul key={i} className="list-disc pl-5 space-y-1">
+                {lines.filter(l => l.trim().startsWith("-")).map((l, idx) => (
+                  <li key={idx}>{l.replace(/^\s*-\s*/, "")}</li>
+                ))}
+              </ul>
+            );
+          }
+          return <p key={i}>{block}</p>;
+        })}
+      </div>
+    );
   }
 
   return (
@@ -247,11 +277,26 @@ export default function Dashboard({ profile }: DashboardProps) {
               )}
               {chatMessages.map((msg, idx) => (
                 <div key={idx} className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}>
-                  <span className={`inline-block px-3 py-2 rounded-2xl ${msg.role === "user" ? "gradient-primary text-white" : "bg-white/5 border border-card-border"}`}>
-                    {msg.text}
+                  <span className={`inline-block px-3 py-2 rounded-2xl text-sm ${msg.role === "user" ? "gradient-primary text-white" : "bg-white/5 border border-card-border"}`}>
+                    {msg.role === "user" ? (
+                      msg.text
+                    ) : (
+                      renderFormatted(msg.text)
+                    )}
                   </span>
                 </div>
               ))}
+              {chatLoading && (
+                <div className="mb-2 text-left">
+                  <span className="inline-block px-3 py-2 rounded-2xl bg-white/5 border border-card-border">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <div className="w-2 h-2 rounded-full bg-current animate-bounce" />
+                      <div className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: '0.1s' }} />
+                      <div className="w-2 h-2 rounded-full bg-current animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    </div>
+                  </span>
+                </div>
+              )}
             </div>
             <div className="mt-3 flex gap-2">
               <input
