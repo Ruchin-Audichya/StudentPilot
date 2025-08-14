@@ -1,3 +1,67 @@
+## Quick start
+
+This repo is a full-stack app:
+- Frontend: React + Vite (TypeScript, Tailwind/shadcn)
+- Backend: FastAPI (Python) with AI via OpenRouter or Gemini
+
+### 1) Prerequisites
+- Node.js 18+ and npm
+- Python 3.11+
+
+### 2) Clone
+```bash
+git clone https://github.com/Ruchin-Audichya/StudentPilot.git
+cd StudentPilot
+```
+
+### 3) Env vars (do not commit secrets)
+- Copy `.env.example` to `.env.local` (frontend) and `backend/.env.example` to `backend/.env` (backend) and set values.
+
+Frontend `.env.local`:
+```
+VITE_API_BASE=http://127.0.0.1:8011
+
+# Firebase (optional)
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+```
+
+Backend `backend/.env`:
+```
+# Prefer OpenRouter; fallback to Gemini if not set
+OPENROUTER_API_KEY=
+OPENROUTER_MODELS=qwen/qwen3-coder:free, google/gemma-2-9b-it:free
+OPENROUTER_BASE=https://openrouter.ai/api/v1/chat/completions
+OPENROUTER_SITE_URL=http://localhost:5173
+OPENROUTER_SITE_NAME=StudentPilot
+
+# Optional Gemini fallback
+GOOGLE_API_KEY=
+```
+
+The backend auto-loads env from both repo root and `backend/`.
+
+### 4) Install & run
+Backend:
+```powershell
+cd backend
+python -m venv .venv; . .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m uvicorn main:app --host 127.0.0.1 --port 8011
+```
+
+Frontend (in another terminal):
+```powershell
+npm install
+npm run dev
+```
+
+- App: http://127.0.0.1:5173 (Vite)
+- API: http://127.0.0.1:8011
 <div align="center">
 
 # Where's My Stipend
@@ -15,14 +79,14 @@ Find internships that actually match your skills. Upload your resume, search wit
 - Resume-aware search: upload a PDF/DOCX/TXT and we extract key skills automatically.
 - Internship finder powered by Internshala scraping with graceful fallbacks.
 - B.Tech buzzwords CSV to bias searches toward relevant student roles (editable).
-- Career chatbot using Google Gemini (1.5 Flash) for fast, helpful answers.
+- Career chatbot via OpenRouter first (multi-model fallback), with Gemini Flash fallback.
 - Modern UI: Tailwind + shadcn-ui + glassmorphism, rounded, responsive.
 
 ## 🧭 Architecture
 
 - Frontend: React + Vite + TypeScript + Tailwind/shadcn.
 - Backend: FastAPI + Uvicorn, simple scraping + keyword extraction.
-- AI: Google Gemini via google-generativeai SDK.
+- AI: OpenRouter HTTP API (preferred) and Google Gemini via google-generativeai (fallback).
 
 ```
 src/                 # React app (UI, services)
@@ -31,53 +95,15 @@ backend/             # FastAPI server
 	data/btech_buzzwords.csv  # CSV of B.Tech job buzzwords
 ```
 
-## 🚀 Getting started
+## �️ Scripts
+You can add tasks.json or use these commands above. For production builds:
+```powershell
+# Frontend build
+npm run build; npm run preview
 
-### 1) Prerequisites
-
-- Node.js 18+ and npm
-- Python 3.11+
-
-### 2) Clone
-
-```bash
-git clone https://github.com/Ruchin-Audichya/StudentPilot.git
-cd StudentPilot
+# Backend (prod)
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-
-### 3) Environment variables
-
-Copy the example and fill in your Gemini API key:
-
-```bash
-cp .env.example .env
-```
-
-Variables
-- GOOGLE_API_KEY: Google Gemini API key for chatbot.
-- PORT: Backend port (default 8000).
-- VITE_API_BASE: Frontend API base (default http://127.0.0.1:8000).
-
-### 4) Install & run
-
-Backend (FastAPI):
-
-```bash
-python -m venv .venv
-. .venv/Scripts/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
-python backend/main.py
-```
-
-Frontend (Vite):
-
-```bash
-npm install
-npm run dev
-```
-
-- App: http://127.0.0.1:8080
-- API: http://127.0.0.1:8000
 
 ### Optional: Enable Firebase (email/password signup + Storage)
 
@@ -145,6 +171,6 @@ This project is provided as-is for learning and prototyping. Choose a license wh
 - Routing updated in `src/App.tsx`; previous index flow kept inside `src/pages/Index.tsx` (exported as OldIndex in code).
 - ResumeUploader enhanced: optional Firebase Storage upload (anonymous auth) while still sending file to backend for parsing.
 - Onboarding updated: when Firebase is enabled, supports email/password signup and saves profile to Firestore. Falls back to local-only if disabled.
-- Backend hardening: optional Firebase Admin and LinkedIn scraper via env flags; duplicate `/api/chat` removed.
+- Backend: OpenRouter-first with multi-model retry/backoff, Gemini flash fallback, optional Firebase Admin and LinkedIn scraper via env flags.
 - LinkedIn scraper dependencies added (selenium, webdriver-manager); Internshala remains default.
 - Buzzwords CSV loaded at startup; search falls back to resume keywords.

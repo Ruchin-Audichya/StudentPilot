@@ -5,13 +5,17 @@ import Landing from "@/pages/Landing";
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
+import AuthPage from "@/pages/AuthPage"; // <-- Added
 
 export default function App() {
   return (
     <Router>
       <Routes>
-  {/* Landing page */}
-  <Route path="/" element={<Landing />} />
+        {/* Landing page */}
+        <Route path="/" element={<Landing />} />
+
+        {/* Auth page */}
+        <Route path="/auth" element={<AuthPage />} />
 
         {/* Onboarding flow */}
         <Route path="/onboarding" element={<Onboarding />} />

@@ -1,10 +1,12 @@
-fastapi
-uvicorn[standard]
-python-dotenv
-python-docx
-google-generativeai
-beautifulsoup4
-requests
-PyMuPDF
-selenium
-webdriver-manager
+fastapi==0.112.2
+uvicorn[standard]==0.30.6
+python-dotenv==1.0.1
+requests==2.32.3
+beautifulsoup4==4.12.3
+python-docx==1.1.2
+PyMuPDF==1.24.9
+google-generativeai==0.8.3
+# Optional: only needed if enabling LinkedIn scraping
+selenium==4.23.1
+webdriver-manager==4.0.2
+python-multipart==0.0.9

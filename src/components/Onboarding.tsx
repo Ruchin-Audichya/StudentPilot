@@ -36,7 +36,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       onComplete(profile);
     }
     // Navigate to dashboard in route-based usage
-    try { navigate("/dashboard"); } catch {}
+    try {
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Navigation failed:", error);
+    }
   }
 
   return (
