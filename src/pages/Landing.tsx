@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
 import { FileText, Sparkles, Globe } from "lucide-react";
+import { motion } from "framer-motion";
 import resumeImg from "@/assets/resume.png"; // Using PNG for the resume image
 import { Link } from "react-router-dom";
 
@@ -73,25 +74,34 @@ export default function Landing() {
         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
           <Sparkles size={14} className="text-yellow-300" /> AI-powered intern finder
         </span>
-        <h2 className="mt-4 text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+        <motion.h2
+          initial={{ clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+          animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+          transition={{ duration: 1.7, ease: "easeOut" }}
+          className="mt-4 text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent"
+        >
           Where’s My Stipend?
-        </h2>
+        </motion.h2>
         <p className="mt-3 sm:mt-4 text-gray-400 text-base sm:text-lg md:text-xl max-w-2xl mx-auto">
           Your skills. Your dreams. Your stipend—delivered.
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
-          <Link
-            to="/auth"
-            className="bg-white text-black px-5 py-3 rounded-full font-semibold text-sm sm:text-base shadow hover:bg-gray-200"
-          >
-            Find My Stipend
-          </Link>
-          <Link
-            to="/onboarding"
-            className="px-5 py-3 rounded-full font-semibold text-sm sm:text-base border border-white/20 hover:bg-white/10"
-          >
-            Try Demo
-          </Link>
+          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.25 }} className="inline-block">
+            <Link
+              to="/auth"
+              className="bg-white text-black px-5 py-3 rounded-full font-semibold text-sm sm:text-base shadow hover:bg-gray-200"
+            >
+              Find My Stipend
+            </Link>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.25 }} className="inline-block">
+            <Link
+              to="/onboarding"
+              className="px-5 py-3 rounded-full font-semibold text-sm sm:text-base border border-white/20 hover:bg-white/10"
+            >
+              Try Demo
+            </Link>
+          </motion.div>
         </div>
       </section>
 
@@ -110,7 +120,13 @@ export default function Landing() {
       {/* Features */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 hover:bg-white/[0.08] transition">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.85, ease: "easeOut" }}
+            className="rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 hover:bg-white/[0.08] transition"
+          >
             <div className="flex items-center gap-3 mb-2">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
                 <FileText size={18} />
@@ -118,8 +134,14 @@ export default function Landing() {
               <h3 className="text-lg font-bold">Resume analysis</h3>
             </div>
             <p className="text-gray-400 text-sm sm:text-base">Upload your CV for smart insights.</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 hover:bg-white/[0.08] transition">
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.95, ease: "easeOut" }}
+            className="rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 hover:bg-white/[0.08] transition"
+          >
             <div className="flex items-center gap-3 mb-2">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
                 <Sparkles size={18} />
@@ -127,8 +149,14 @@ export default function Landing() {
               <h3 className="text-lg font-bold">AI matching</h3>
             </div>
             <p className="text-gray-400 text-sm sm:text-base">Personalized internship and job finds.</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 hover:bg-white/[0.08] transition">
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 1.05, ease: "easeOut" }}
+            className="rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 hover:bg-white/[0.08] transition"
+          >
             <div className="flex items-center gap-3 mb-2">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
                 <Globe size={18} />
@@ -136,7 +164,7 @@ export default function Landing() {
               <h3 className="text-lg font-bold">Live scraping</h3>
             </div>
             <p className="text-gray-400 text-sm sm:text-base">Internshala and LinkedIn, always fresh.</p>
-          </div>
+          </motion.div>
         </div>
       </section>
 

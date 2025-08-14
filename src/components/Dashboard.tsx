@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
 
@@ -224,9 +225,33 @@ export default function Dashboard({ profile }: DashboardProps) {
             {results.length === 0 && !loading && (
               <p className="text-muted-foreground">No results yet. Try a search above.</p>
             )}
+            {loading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-card-border bg-white/5 p-5">
+                    <div className="h-4 w-2/3 bg-white/10 rounded shimmer mb-2" />
+                    <div className="h-3 w-1/2 bg-white/10 rounded shimmer mb-4" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-full bg-white/10 rounded shimmer" />
+                      <div className="h-3 w-5/6 bg-white/10 rounded shimmer" />
+                      <div className="h-3 w-2/3 bg-white/10 rounded shimmer" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {results.map((job) => (
-                <article key={job.id} className="glass-card rounded-2xl p-5 hover:shadow-lg transition">
+              <AnimatePresence initial={false}>
+                {results.map((job) => (
+                  <motion.article
+                    layout
+                    key={job.id}
+                    initial={{ rotateY: 90, opacity: 0 }}
+                    animate={{ rotateY: 0, opacity: 1 }}
+                    exit={{ rotateY: -90, opacity: 0 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="glass-card rounded-2xl p-5 hover:shadow-lg transition [transform-style:preserve-3d]"
+                  >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h3 className="text-base md:text-lg font-bold">{job.title}</h3>
@@ -261,8 +286,9 @@ export default function Dashboard({ profile }: DashboardProps) {
                       Details
                     </button>
                   </div>
-                </article>
-              ))}
+                  </motion.article>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         </div>

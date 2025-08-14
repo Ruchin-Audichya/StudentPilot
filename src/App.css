@@ -1,3 +1,13 @@
+@keyframes shimmer {
+  0% { background-position: -500px 0; }
+  100% { background-position: 500px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.08) 25%, rgba(255,255,255,0.18) 37%, rgba(255,255,255,0.08) 63%);
+  background-size: 1000px 100%;
+  animation: shimmer 1.2s infinite linear;
+}
 #root {
   max-width: 1280px;
   margin: 0 auto;

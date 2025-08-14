@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
 interface StudentProfile {
@@ -56,7 +57,21 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           Fill your details to personalize recommendations.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Progress bar (simple, animated) */}
+        <div className="mb-4 h-2 w-full rounded bg-white/10 overflow-hidden">
+          <motion.div className="h-full bg-white/60" initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 0.8 }} />
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.form
+            key="step-basic"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onSubmit={handleSubmit}
+            className="space-y-4"
+          >
           <div>
             <label className="block text-sm font-semibold mb-1">Name</label>
             <input
@@ -64,7 +79,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-white/50 shadow-[0_0_0_0_rgba(255,255,255,0)] focus:shadow-[0_0_20px_2px_rgba(255,255,255,0.12)] transition"
               placeholder="John Doe"
             />
           </div>
@@ -77,7 +92,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               type="text"
               value={skills}
               onChange={(e) => setSkills(e.target.value)}
-              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-white/50 shadow-[0_0_0_0_rgba(255,255,255,0)] focus:shadow-[0_0_18px_2px_rgba(255,255,255,0.1)] transition"
               placeholder="Python, Machine Learning, React"
             />
           </div>
@@ -90,7 +105,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               type="text"
               value={interests}
               onChange={(e) => setInterests(e.target.value)}
-              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-white/50 shadow-[0_0_0_0_rgba(255,255,255,0)] focus:shadow-[0_0_18px_2px_rgba(255,255,255,0.1)] transition"
               placeholder="Data Science, AI, Web Development"
             />
           </div>
@@ -103,7 +118,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="bg-input/50 border border-card-border rounded-full px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-white/50 shadow-[0_0_0_0_rgba(255,255,255,0)] focus:shadow-[0_0_18px_2px_rgba(255,255,255,0.1)] transition"
               placeholder="India, Remote, New Delhi"
             />
           </div>
@@ -114,7 +129,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           >
             Continue to Dashboard
           </button>
-        </form>
+          </motion.form>
+        </AnimatePresence>
       </div>
     </div>
   );
