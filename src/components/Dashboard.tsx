@@ -246,15 +246,24 @@ export default function Dashboard({ profile }: DashboardProps) {
                   <motion.article
                     layout
                     key={job.id}
-                    initial={{ rotateY: 90, opacity: 0 }}
-                    animate={{ rotateY: 0, opacity: 1 }}
-                    exit={{ rotateY: -90, opacity: 0 }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
-                    className="glass-card rounded-2xl p-5 hover:shadow-lg transition [transform-style:preserve-3d]"
+                    initial={{ y: 16, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -16, opacity: 0 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    className="glass-card rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition duration-200 group"
                   >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-base md:text-lg font-bold">{job.title}</h3>
+                      <h3 className="text-base md:text-lg font-bold flex items-center gap-2">
+                        <span>{job.title}</span>
+                        {/* New/Hot badges */}
+                        {job.is_new && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">🆕 New</span>
+                        )}
+                        {Array.isArray(job.required_skills) && job.required_skills.some(t => (t || '').toLowerCase().includes('🔥 hot')) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/30">🔥 Hot</span>
+                        )}
+                      </h3>
                       <p className="text-sm text-muted-foreground">{job.company} • {job.location}</p>
                     </div>
                     <span className="text-xs px-2 py-1 rounded-full bg-white/5 border border-card-border">{job.source}</span>
@@ -263,10 +272,25 @@ export default function Dashboard({ profile }: DashboardProps) {
                   {job.description && (
                     <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{job.description}</p>
                   )}
+                  {/* Score bar */}
+                  {typeof job.score === 'number' && job.score >= 0 && job.score <= 100 && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                        <span>Match</span>
+                        <span className="font-medium text-foreground">{Math.round(job.score)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
+                          style={{ width: `${Math.max(0, Math.min(100, job.score))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   {job.required_skills && job.required_skills.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {job.required_skills.slice(0, 6).map((t, i) => (
-                        <span key={i} className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border">{t}</span>
+                        <span key={i} className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border group-hover:bg-white/10 transition">{t}</span>
                       ))}
                     </div>
                   )}
@@ -275,7 +299,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                       href={job.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-full px-4 py-2 gradient-primary text-white hover:opacity-95 transition"
+                      className="rounded-full px-4 py-2 gradient-primary text-white hover:opacity-95 transition shadow-sm group-hover:shadow"
                     >
                       Apply Now
                     </a>

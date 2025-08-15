@@ -10,6 +10,9 @@ export interface JobResult {
   description?: string;
   posted_at?: string;
   required_skills?: string[];
+  // Optional visual indicators if backend provides them
+  is_new?: boolean;
+  score?: number; // 0-100
 }
 
 export interface JobSearchParams {
@@ -44,5 +47,7 @@ export async function searchInternships(params: JobSearchParams): Promise<JobRes
     description: x.description || "",
     posted_at: x.posted_at || undefined,
     required_skills: x.tags || [],
+  is_new: x.is_new,
+  score: typeof x.score === 'number' ? x.score : undefined,
   }));
 }
