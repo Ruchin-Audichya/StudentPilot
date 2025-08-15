@@ -25,6 +25,11 @@ app.add_middleware(
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
+# Basic health check for load balancers / EB
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 resume_text = ""
 resume_profile = {"skills": set(), "roles": set(), "location": None}
 buzzword_skills = set()
@@ -76,6 +81,26 @@ def _extract_location(text: str):
     if match:
         return _normalize(match.group(1))
     return None
+
+def _extract_email(text: str) -> Optional[str]:
+    m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+    return m.group(0) if m else None
+
+def _extract_phone(text: str) -> Optional[str]:
+    m = re.search(r"(\+?\d[\d\-() ]{7,}\d)", text)
+    return _normalize(m.group(1)) if m else None
+
+def _extract_name(text: str) -> Optional[str]:
+    lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
+    for l in lines[:8]:
+        if "@" in l or len(l.split()) > 8:
+            continue
+        words = l.split()
+        if 1 < len(words) <= 5 and all(w[0:1].isalpha() for w in words):
+            cand = " ".join(w.capitalize() for w in words)
+            return cand
+    m = re.search(r"name\s*[:\-]\s*([A-Za-z ]{3,})", (text or ""), re.I)
+    return _normalize(m.group(1)) if m else None
 
 def _tag_new(posted: Optional[str]) -> bool:
     if not posted:
@@ -131,6 +156,9 @@ class Internship(BaseModel):
     tags: Optional[List[str]]
     score: Optional[float]
     is_new: Optional[bool]
+
+class ChatRequest(BaseModel):
+    message: str
 
 # -----------------------------
 # Search Endpoint
@@ -234,6 +262,133 @@ def search_internships(req: SearchRequest):
         )
         for job in diverse_jobs
     ]
+
+# -----------------------------
+# Chat Endpoint (resume-aware and fun)
+# -----------------------------
+@app.post("/api/chat")
+def chat_with_ai(req: ChatRequest):
+    global resume_text, resume_profile
+    msg = (req.message or "").strip()
+    lower = msg.lower()
+
+    if not msg:
+        return {"response": "- SUMMARY: Tell me something like ‘Rate my resume’ or ‘Skill gap for frontend’."}
+
+    name = _extract_name(resume_text) if resume_text else None
+    email = _extract_email(resume_text) if resume_text else None
+    phone = _extract_phone(resume_text) if resume_text else None
+    location = resume_profile.get("location") if resume_profile else None
+
+    def has(*terms):
+        return any(t in lower for t in terms)
+
+    # Identity summary
+    if has("who am i", "about me", "who i am", "who he is", "who she is", "who is he", "who is she"):
+        lines = [
+            "- SUMMARY: Here’s what I know about you from the resume.",
+            f"- NAME: {name or 'Not found (add it at the top of your resume)'}",
+            f"- EMAIL: {email or 'Not found'}",
+            f"- PHONE: {phone or 'Not found'}",
+            f"- LOCATION: {location or 'Not found'}",
+            f"- TOP SKILLS: {', '.join(sorted(list(resume_profile.get('skills', [])))[:8]) or '—'}",
+            f"- ROLES OF INTEREST: {', '.join(sorted(list(resume_profile.get('roles', [])))[:5]) or '—'}",
+            "- TIP: Add a short headline like ‘Aspiring ML Engineer | Python • SQL • DL’.",
+        ]
+        return {"response": "\n".join(lines)}
+
+    # Resume rating
+    if has("rate", "score") and "resume" in lower:
+        if not resume_text:
+            return {"response": "- SUMMARY: Upload your resume first, and I’ll rate it out of 10 with strengths and fixes."}
+        base = 5
+        skill_bonus = min(4, len(resume_profile.get("skills", [])) * 0.4)
+        contact_bonus = 0.5 if email else 0
+        score10 = max(4.5, min(9.5, base + skill_bonus + contact_bonus))
+        score10 = round(score10, 1)
+        strengths = [
+            "Clear skills mentioned" if resume_profile.get("skills") else "Some skills detected",
+            "Relevant roles appear in text" if resume_profile.get("roles") else "Role intent is implicit",
+            "Contact info present" if email or phone else "Structure is easy to follow",
+        ]
+        improvements = [
+            "Use action verbs (Built, Led, Achieved) + metrics (↑%, ↓ms).",
+            "Add 2–3 impact bullets per experience; keep to one page if early career.",
+            "Mirror 6–8 keywords from the target JD.",
+        ]
+        next_steps = [
+            "Pick 3 target roles and tailor bullets for each.",
+            "Add a ‘PROJECTS’ section with GitHub links.",
+            "Place email/phone and a short headline at the top.",
+        ]
+        out = [
+            f"- SUMMARY: Score: {score10}/10 — solid base with room to polish.",
+            "- STRENGTHS:",
+            *[f"  - {s}" for s in strengths],
+            "- IMPROVEMENTS:",
+            *[f"  - {s}" for s in improvements],
+            "- NEXT STEPS:",
+            *[f"  - {s}" for s in next_steps],
+        ]
+        return {"response": "\n".join(out)}
+
+    # Skill gap analysis
+    if has("skill gap", "gap analysis", "missing skills"):
+        if not resume_text:
+            return {"response": "- SUMMARY: Upload your resume and tell me the target role, e.g., ‘Skill gap for frontend’."}
+        track_map = {
+            "frontend": ["javascript", "react", "typescript", "css", "html", "tailwind", "next.js", "testing"],
+            "backend": ["python", "fastapi", "django", "node", "postgresql", "mysql", "redis", "docker"],
+            "data": ["python", "pandas", "numpy", "sql", "machine learning", "scikit-learn", "tensorflow", "power bi"],
+            "ml": ["python", "numpy", "pandas", "pytorch", "tensorflow", "mlops", "experiment tracking"],
+            "devops": ["linux", "docker", "kubernetes", "aws", "ci/cd", "terraform", "monitoring"],
+            "android": ["kotlin", "android studio", "jetpack", "compose", "rest api", "testing"],
+        }
+        chosen = None
+        for key in track_map:
+            if key in lower:
+                chosen = key; break
+        if not chosen:
+            for r in resume_profile.get("roles", []):
+                for key in track_map:
+                    if key in r:
+                        chosen = key; break
+                if chosen: break
+        chosen = chosen or "frontend"
+        target = set(track_map[chosen])
+        have = set(resume_profile.get("skills", []))
+        matched = sorted([s for s in target if s in have])
+        missing = sorted([s for s in target if s not in have])
+        plan = {
+            "frontend": ["Build 3 mini-apps (Todo, Kanban, Charts) with React+TS.", "Add unit tests (Vitest/Jest).", "Deploy on Vercel."],
+            "backend": ["Design a REST API with FastAPI.", "Add auth + Postgres + Docker.", "Write 5 integration tests."],
+            "data": ["Solve 3 Kaggle datasets.", "Write SQL queries over 3 tables.", "Publish a notebook with EDA."],
+            "ml": ["Implement 3 models from scratch.", "Track experiments with MLflow.", "Serve a model with FastAPI."],
+            "devops": ["Dockerize 2 apps.", "Create a K8s deployment locally.", "Set up CI on GitHub Actions."],
+            "android": ["Clone a UI from Dribbble.", "Use Retrofit for API.", "Add Compose navigation + tests."],
+        }[chosen]
+        out = [
+            f"- SUMMARY: {chosen.capitalize()} skill gap based on your resume.",
+            "- MATCHED SKILLS:",
+            *( ["  - (none)"] if not matched else [f"  - {s}" for s in matched] ),
+            "- MISSING SKILLS:",
+            *( ["  - (none)"] if not missing else [f"  - {s}" for s in missing] ),
+            "- LEARNING PLAN:",
+            *[f"  - {s}" for s in plan],
+        ]
+        return {"response": "\n".join(out)}
+
+    tips = [
+        "Upload your resume for tailored advice.",
+        "Ask ‘Skill gap for backend’ or ‘Rate my resume’.",
+        "Try a fun prompt like ‘Give me a 3-step plan for a paid internship this month’.",
+    ]
+    out = [
+        "- SUMMARY: I’m your internship co-pilot—fast, friendly, and resume-aware.",
+        "- TRY:",
+        *[f"  - {t}" for t in tips],
+    ]
+    return {"response": "\n".join(out)}
 
 # -----------------------------
 # Resume Upload Endpoint

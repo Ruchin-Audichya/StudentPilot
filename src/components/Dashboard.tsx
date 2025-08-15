@@ -41,6 +41,19 @@ export default function Dashboard({ profile }: DashboardProps) {
 
   const firstName = useMemo(() => (effective?.name || "").split(" ")[0] || "there", [effective?.name]);
 
+  // Lightweight animation variants for result items (non-blocking, short duration)
+  const listVariants = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.06, delayChildren: 0.02 },
+    },
+  } as const;
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } },
+    exit: { opacity: 0, y: -8, transition: { duration: 0.15 } },
+  } as const;
+
   async function handleSearch() {
     setLoading(true);
     try {
@@ -172,49 +185,71 @@ export default function Dashboard({ profile }: DashboardProps) {
           </div>
 
           {/* Search panel */}
-          <div className="glass-card rounded-2xl p-5 md:p-6 animate-slide-up">
+          <div className="glass-card rounded-3xl p-5 md:p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="text-lg font-semibold">Find Internships</h2>
               <button
                 onClick={handleSearch}
                 disabled={loading}
-                className="rounded-full px-5 py-2 gradient-success text-white shadow-md hover:opacity-95 transition disabled:opacity-50"
+                className="rounded-full px-5 py-2 gradient-success text-white shadow-md hover:shadow-lg hover:opacity-95 active:scale-[0.99] transition disabled:opacity-50"
               >
                 {loading ? "Searching..." : "Search"}
               </button>
             </div>
-            <div className="grid md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input
                 type="text"
-                placeholder="Skills e.g. React, Python"
+                placeholder="🔍 Search by role or skill… e.g. React, Python"
                 defaultValue={skills.join(", ")}
                 onChange={(e) => setSkills(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                className="bg-input/50 border border-card-border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="bg-input/50 border border-card-border rounded-2xl px-3 py-2 shadow-sm hover:shadow focus:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               <input
                 type="text"
-                placeholder="Interests e.g. AI, Web Dev"
+                placeholder="✨ Interests e.g. AI, Web Dev"
                 defaultValue={interests.join(", ")}
                 onChange={(e) => setInterests(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                className="bg-input/50 border border-card-border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="bg-input/50 border border-card-border rounded-2xl px-3 py-2 shadow-sm hover:shadow focus:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               <input
                 type="text"
-                placeholder="Location"
+                placeholder="📍 Location"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="bg-input/50 border border-card-border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="bg-input/50 border border-card-border rounded-2xl px-3 py-2 shadow-sm hover:shadow focus:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
             {/* chips */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {skills.map((s, i) => (
-                <span key={`sk-${i}`} className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border">{s}</span>
-              ))}
-              {interests.map((s, i) => (
-                <span key={`in-${i}`} className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border">{s}</span>
-              ))}
-            </div>
+            <motion.div layout className="mt-3 flex flex-wrap gap-2">
+              <AnimatePresence initial={false}>
+                {skills.map((s, i) => (
+                  <motion.span
+                    layout
+                    key={`sk-${s}-${i}`}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border shadow-sm hover:shadow transition"
+                  >
+                    {s}
+                  </motion.span>
+                ))}
+                {interests.map((s, i) => (
+                  <motion.span
+                    layout
+                    key={`in-${s}-${i}`}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border shadow-sm hover:shadow transition"
+                  >
+                    {s}
+                  </motion.span>
+                ))}
+              </AnimatePresence>
+            </motion.div>
           </div>
 
           {/* Results */}
@@ -241,22 +276,29 @@ export default function Dashboard({ profile }: DashboardProps) {
                 ))}
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+              variants={listVariants}
+              initial="hidden"
+              animate="show"
+              layout
+            >
               <AnimatePresence initial={false}>
                 {results.map((job) => (
                   <motion.div
                     layout
                     key={job.id}
-                    initial={{ y: 16, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -16, opacity: 0 }}
-                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="show"
+                    exit="exit"
+                    style={{ willChange: "transform, opacity" }}
                   >
                     <JobCard job={job} />
                   </motion.div>
                 ))}
               </AnimatePresence>
-            </div>
+            </motion.div>
           </div>
         </div>
 

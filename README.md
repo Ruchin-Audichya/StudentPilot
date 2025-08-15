@@ -1,23 +1,70 @@
-## Quick start
+<div align="center">
 
-This repo is a full-stack app:
-- Frontend: React + Vite (TypeScript, Tailwind/shadcn)
-- Backend: FastAPI (Python) with AI via OpenRouter or Gemini
+# Where’s My Stipend 💸
 
-### 1) Prerequisites
+Find paid internships that actually match your skills — upload your resume, set your interests, and let the app surface the best fits from across the web.
+
+<br/>
+
+![Hero](./src/assets/hero-nexus.jpg)
+
+</div>
+
+## 🧩 Problem Statement
+
+Students waste countless hours hunting through job boards for relevant internships. Most results are noisy, unpaid, or poorly matched. Where’s My Stipend automates discovery by parsing your resume and preferences, then matching you with paid internships that fit — fast.
+
+## ✨ Features
+
+- Resume upload & parsing (PDF/DOCX/TXT) to auto-extract skills and roles
+- LinkedIn + Internshala scraping for a broader, fresher pool of internships
+- Buzzword-driven query expansion tuned for student/early-career roles
+- Match percentage scoring so you can prioritize the best fits
+- Tags for Hot/New jobs to highlight urgency and recency
+- Optional: friendly, resume‑aware chat that explains your profile and gives quick tips
+
+## 🛠 Tech Stack
+
+- Frontend: React 18, Vite, TypeScript, Tailwind CSS, shadcn/ui, framer-motion
+- Backend: FastAPI, Uvicorn + Gunicorn, Selenium (Chromium + Chromedriver), BeautifulSoup4, Requests
+- Resume parsing: PyMuPDF (PDF), python-docx (DOCX)
+- Matching: scikit-learn, rapidfuzz; CSV‑based buzzwords for query expansion
+- AI (optional): google-generativeai, OpenRouter multi-model strategy
+- Data & Auth (optional): Firebase Auth (Anonymous + Email/Password), Firestore, Storage
+- DevOps: Docker, AWS Elastic Beanstalk (single Docker container), Nginx health checks
+
+## 📦 Installation
+
+Prerequisites:
 - Node.js 18+ and npm
 - Python 3.11+
 
-### 2) Clone
-```bash
+Clone:
+```powershell
 git clone https://github.com/Ruchin-Audichya/StudentPilot.git
 cd StudentPilot
 ```
 
-### 3) Env vars (do not commit secrets)
-- Copy `.env.example` to `.env.local` (frontend) and `backend/.env.example` to `backend/.env` (backend) and set values.
+Environment variables (don’t commit secrets):
+- Copy `.env.example` → `.env.local` for the frontend.
+- Copy `backend/.env.example` → `backend/.env` for the backend.
 
-Frontend `.env.local`:
+### 🔑 Environment variables quick reference
+
+- Frontend (Vite) reads from `import.meta.env.*` (must be prefixed with `VITE_`).
+	- `VITE_API_BASE` → used in `src/api.ts` and `src/services/jobApi.ts` to call your backend.
+	- `VITE_FIREBASE_*` → used in `src/lib/firebase.ts` for Firebase Web SDK (Auth/Firestore/Storage).
+		- If any critical Firebase key is missing, we log a clear warning and avoid initializing modules to prevent runtime crashes.
+
+- Backend (FastAPI) reads process env variables (12-factor style):
+	- `OPENROUTER_*` → preferred AI provider for chat; configured in `backend/main.py` (current chat is local/resume-aware, keys are optional).
+	- `GOOGLE_API_KEY` → optional Gemini fallback.
+	- `FIREBASE_*` → optional Admin SDK (project ID, client email, and private key) if server needs to verify tokens or write to Firestore.
+	- `PORT` → honored by Gunicorn in `backend/Dockerfile` and EB config.
+
+For Netlify/Vercel/Amplify: set the `VITE_*` variables in the dashboard UI. For the backend (EB/Render/ECS), set server env variables there. The repo includes `netlify.toml`, `vercel.json`, and `backend/.ebextensions` to smooth defaults.
+
+Frontend `.env.local` (example):
 ```
 VITE_API_BASE=http://127.0.0.1:8011
 
@@ -30,7 +77,7 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
-Backend `backend/.env`:
+Backend `backend/.env` (example):
 ```
 # Prefer OpenRouter; fallback to Gemini if not set
 OPENROUTER_API_KEY=
@@ -43,10 +90,9 @@ OPENROUTER_SITE_NAME=StudentPilot
 GOOGLE_API_KEY=
 ```
 
-The backend auto-loads env from both repo root and `backend/`.
+## 🧑‍💻 Local Development
 
-### 4) Install & run
-Backend:
+Backend (FastAPI):
 ```powershell
 cd backend
 python -m venv .venv; . .venv\Scripts\Activate.ps1
@@ -54,146 +100,75 @@ pip install -r requirements.txt
 python -m uvicorn main:app --host 127.0.0.1 --port 8011
 ```
 
-Frontend (in another terminal):
+Frontend (Vite):
 ```powershell
 npm install
 npm run dev
 ```
 
-- App: http://127.0.0.1:5173 (Vite)
-- API: http://127.0.0.1:8011
-<div align="center">
-
-# Where's My Stipend
-
-Find internships that actually match your skills. Upload your resume, search with your interests, and chat with an AI career copilot — all in a sleek glassmorphism UI.
-
-<br/>
-
-![Hero](./src/assets/hero-nexus.jpg)
-
-</div>
-
-## ✨ Features
-
-- Resume-aware search: upload a PDF/DOCX/TXT and we extract key skills automatically.
-- Internship finder powered by Internshala scraping with graceful fallbacks.
-- B.Tech buzzwords CSV to bias searches toward relevant student roles (editable).
-- Career chatbot via OpenRouter first (multi-model fallback), with Gemini Flash fallback.
-- Modern UI: Tailwind + shadcn-ui + glassmorphism, rounded, responsive.
-
-## 🧭 Architecture
-
-- Frontend: React + Vite + TypeScript + Tailwind/shadcn.
-- Backend: FastAPI + Uvicorn, simple scraping + keyword extraction.
-- AI: OpenRouter HTTP API (preferred) and Google Gemini via google-generativeai (fallback).
-
-```
-src/                 # React app (UI, services)
-backend/             # FastAPI server
-	scrapers/          # Internshala scraper
-	data/btech_buzzwords.csv  # CSV of B.Tech job buzzwords
-```
-
-## �️ Scripts
-You can add tasks.json or use these commands above. For production builds:
-```powershell
-# Frontend build
-npm run build; npm run preview
-
-# Backend (prod)
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-## 🐳 Docker (optional)
-
-Build and run both services locally with Docker Compose:
-
-```powershell
-docker compose up --build
-```
-
-- Frontend: http://127.0.0.1:5173
+- App: http://127.0.0.1:5173 (or the port Vite prints)
 - API: http://127.0.0.1:8011
 
-Or build separately:
+## 🚀 Deployment (AWS Elastic Beanstalk + Docker)
 
+The backend ships with a production Dockerfile (`backend/Dockerfile`) that installs Chromium + Chromedriver for Selenium, runs Gunicorn with Uvicorn workers, and honors the `PORT` env.
+
+High‑level steps with EB CLI (from `backend/`):
 ```powershell
-# Backend API
-docker build -t studentpilot-api ./backend
-docker run -p 8011:8000 --env-file backend/.env studentpilot-api
-
-# Frontend static
-docker build -t studentpilot-web .
-docker run -p 5173:80 studentpilot-web
+eb init   # choose region, app name, Docker platform (AL2023)
+eb create studentpilot-api-prod --single
+eb setenv PORT=8000 WORKERS=2 TIMEOUT=120 `
+	OPENROUTER_API_KEY=... GOOGLE_API_KEY=... `
+	FIREBASE_PROJECT_ID=... FIREBASE_CLIENT_EMAIL=... FIREBASE_PRIVATE_KEY=...
+eb deploy
+eb open
 ```
 
-### Optional: Enable Firebase (email/password signup + Storage)
+- Health check: `GET /health` (configured via `.ebextensions` and Nginx snippet)
+- Files: see `backend/.ebextensions` for env/port/health settings
 
-1) In `.env` set:
+## 🖼️ Screenshots
 
-```
-VITE_FIREBASE_ENABLED=true
-VITE_FIREBASE_API_KEY=... 
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_APP_ID=...
-```
+![Landing](docs/screenshots/landing.png)
+![Dashboard](docs/screenshots/dashboard.png)
+![Onboarding](docs/screenshots/onboarding.png)
 
-2) Restart `npm run dev`.
+## � Future Improvements
 
-- On Onboarding, you'll see Email + Password fields. Submitting will create/sign-in a Firebase Auth user and store the profile in Firestore at `users/{uid}`. If Firebase isn't configured, onboarding still works locally (saved to localStorage) and the app continues.
+- AI career coach that explains why each internship matches and gives prep tips
+- Semantic job matching using sentence embeddings (e.g., sentence-transformers)
+- Job alerts (email/WhatsApp) when new matches appear
+- Visual analytics: skill match graph, internship categories pie chart
+- Gamification: badges for applying, completing profile, streaks, etc.
+- More sources: AngelList, Naukri, direct company careers pages
+- Offline mode for cached results and smoother UX
 
-## 🔌 API quick reference
+## 🤝 Contributing
 
-POST /api/upload-resume
-- Body: multipart/form-data, field file(.pdf/.docx/.txt)
-- Use: sets resume context for search/chat
-
-POST /api/search
-- Body: { query: string, filters: { location?: string, experience_level?: string } }
-- Behavior: Uses query first; if empty/no results, falls back to resume keywords (incl. B.Tech buzzwords)
-
-POST /api/chat
-- Body: { message: string }
-- Returns concise, actionable answers using Gemini with your resume as context
-
-## 🧠 B.Tech buzzwords
-
-CSV: `backend/data/btech_buzzwords.csv`
-- Format: `Job_Title,Required_Skills`
-- You can edit or replace this file to tune search weightings for student roles.
-
-## 🖌️ UI notes
-
-- Glass cards via `.glass-card` class in `src/index.css`.
-- Rounded, gradient buttons: `gradient-primary`, `gradient-success`, etc.
-
-## 🤝 Contributors
-
-- Ruchin Audichya — Dev , UI/UX 
-- Shriya Gakkhar — Idea, UI/UX and product shaping, bugs fixing
-	- GitHub: https://github.com/shriya-gakkhar1
-
-If you find this useful, star the repo and share feedback!
-
-## 🔐 Security
-
-Do not commit secrets. `.env` is git-ignored. Use `.env.example` as a guide.
+Contributions are welcome! Please fork the repo and open a PR:
+1. Create a feature branch
+2. Make your changes with tests where relevant
+3. Run lint/build locally
+4. Open a Pull Request with a clear description and screenshots
 
 ## 📄 License
 
-This project is provided as-is for learning and prototyping. Choose a license when you’re ready to open-source or distribute.
+This project is provided as-is for learning and prototyping. You can adopt MIT or your preferred license when ready (add a LICENSE file).
 
----
+## 📢 What’s New (Latest Improvements)
 
-## What changed recently
+- Backend Dockerfile for production: Chromium + Chromedriver, Gunicorn/Uvicorn, `PORT` support
+- AWS Elastic Beanstalk configs: `.ebextensions`, `/health` endpoint, Nginx proxy for health
+- LinkedIn scraper via Selenium (headless Chrome) alongside Internshala; balanced, de-duplicated results
+- Buzzword‑driven query expansion and per‑source score normalization
+- Resume‑aware chat endpoint (identity summary, resume rating, skill gap analysis)
+- Visual overhaul: Landing animations, modern Dashboard with JobCard (New/Hot badges, match score bar)
+- Anonymous onboarding + Firestore writes; account linking on email login
+- Firebase initialization hardening and Storage helpers for resume upload
 
-- New Landing page at `/` with responsive navbar; buttons navigate to `/onboarding` via SPA.
-- Routing updated in `src/App.tsx`; previous index flow kept inside `src/pages/Index.tsx` (exported as OldIndex in code).
-- ResumeUploader enhanced: optional Firebase Storage upload (anonymous auth) while still sending file to backend for parsing.
-- Onboarding updated: when Firebase is enabled, supports email/password signup and saves profile to Firestore. Falls back to local-only if disabled.
-- Backend: OpenRouter-first with multi-model retry/backoff, Gemini flash fallback, optional Firebase Admin and LinkedIn scraper via env flags.
-- LinkedIn scraper dependencies added (selenium, webdriver-manager); Internshala remains default.
-- Buzzwords CSV loaded at startup; search falls back to resume keywords.
+## 🙌 Credits
+
+- Lead Developer & UX: [Ruchin Audichya](https://github.com/Ruchin-Audichya)
+- Product & UX, QA: [Shriya Gakkhar](https://github.com/shriya-gakkhar1)
+
+If you find this useful, ⭐ the repo and share feedback!

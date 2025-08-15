@@ -1,4 +1,4 @@
-# backend/scrapers/linkedin_scraper.py
+import os
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -14,9 +14,13 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
     """
     # Configure Chrome options for a headless browser
     options = Options()
-    options.add_argument("--headless")  # Run Chrome in headless mode (without a UI)
-    options.add_argument("--no-sandbox") # Required for running in some environments (e.g., Docker)
-    options.add_argument("--disable-dev-shm-usage") # Overcomes limited resource problems
+    # Headless Chrome configs for containers
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--window-size=1920,1080")
     # Add a user-agent to mimic a real browser request
     options.add_argument(
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -26,8 +30,15 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
     internships = []
     try:
         # Initialize the Chrome WebDriver
-        # ChromeDriverManager automatically downloads and manages the correct chromedriver version
-        service = Service(ChromeDriverManager().install())
+        # Prefer system-installed chromedriver (provided by Docker image) and fallback to manager.
+        drv_path = os.getenv("CHROMEDRIVER")
+        try:
+            if drv_path and os.path.exists(drv_path):
+                service = Service(drv_path)
+            else:
+                service = Service(ChromeDriverManager().install())
+        except Exception:
+            service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
 
         # Build the LinkedIn job search URL
