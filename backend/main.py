@@ -16,6 +16,9 @@ from datetime import datetime, timedelta
 from scrapers.internshala import fetch_internships
 from scrapers.linkedin import fetch_linkedin_internships
 
+# Allow disabling heavier LinkedIn Selenium scraper (e.g. on platforms without Chromium)
+DISABLE_LINKEDIN = os.getenv("DISABLE_LINKEDIN", "0") in {"1", "true", "yes", "on"}
+
 # -----------------------------
 # App Setup
 # -----------------------------
@@ -188,7 +191,8 @@ def search_internships(req: SearchRequest):
         futures = []
         for q in queries:
             futures.append(executor.submit(fetch_internships, q, location))
-            futures.append(executor.submit(fetch_linkedin_internships, q, location))
+            if not DISABLE_LINKEDIN:
+                futures.append(executor.submit(fetch_linkedin_internships, q, location))
         for f in as_completed(futures):
             try:
                 jobs = f.result()

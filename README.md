@@ -172,3 +172,86 @@ This project is provided as-is for learning and prototyping. You can adopt MIT o
 - Product & UX, QA: [Shriya Gakkhar](https://github.com/shriya-gakkhar1)
 
 If you find this useful, ⭐ the repo and share feedback!
+
+## 🌊 Deployment on DigitalOcean (App Platform or Droplet)
+
+### Option A: App Platform (recommended – managed build & deploy)
+1. Push this repo to GitHub (make sure `.env` files are NOT committed).
+2. In DigitalOcean App Platform, create a new App from the repo.
+3. Components:
+   - Backend: Select `backend/` directory as a Web Service (Dockerfile auto-detected). Set HTTP port to `8000` (App Platform injects `PORT`).
+   - Frontend: Select root with `Dockerfile` OR use a Static Site:
+     - If Static Site: build command `npm run build`, output dir `dist`.
+     - Set env var `VITE_API_BASE` to the deployed backend URL.
+4. Environment Variables:
+   - Backend: `PORT=8000`, optional `DISABLE_LINKEDIN=1` (saves memory / avoids Selenium if Chromium not needed), any API keys.
+   - Frontend: `VITE_API_BASE=https://<backend-domain>`.
+5. Scale: Start with Basic 1 vCPU / 1GB for backend (Selenium + Chromium may need 2GB). If using `DISABLE_LINKEDIN=1`, 1GB is fine.
+6. Deploy – health check hits `/health`.
+
+### Option B: Droplet (manual Docker Compose)
+```bash
+# On a fresh Ubuntu 22.04 droplet
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin
+sudo usermod -aG docker $USER
+# Re-log then:
+ git clone https://github.com/your-user/StudentPilot.git
+ cd StudentPilot
+ # Create env files
+ cp backend/.env.example backend/.env
+ echo "DISABLE_LINKEDIN=1" >> backend/.env
+ # Build & run
+ docker compose up -d --build
+ # Backend: :8011, Frontend: :5173 (adjust security group / firewall)
+```
+
+### Disabling LinkedIn Scraper
+If you face memory/time issues or do not need LinkedIn data initially, set `DISABLE_LINKEDIN=1` (added in `backend/main.py` and passed through Docker). This skips Selenium & Chromium usage.
+
+### Production Hardening Checklist
+- Add a CDN (DigitalOcean CDN or Cloudflare) in front of the static frontend.
+- Enable HTTPS (App Platform auto TLS; for Droplet use Caddy/Traefik or nginx + certbot).
+- Set `WORKERS` / `TIMEOUT` env vars for Gunicorn tuning (default config in `gunicorn_conf.py`).
+- Add log forwarding (App Platform built-in; Droplet use `docker logs` or a sidecar like Vector).
+- Configure alerts (monitor 5xx rate & CPU > 85%).
+
+## 🚈 Deployment on Railway
+
+Railway can auto-detect the backend as a Docker service and frontend as a static build.
+
+Backend (FastAPI + Gunicorn):
+1. New Project -> Deploy from GitHub repo.
+2. Select the repository; Railway finds `backend/Dockerfile` if you create a separate service pointing to that path.
+3. Service Settings:
+   - Build Args (optional): `INSTALL_CHROME=0` (saves ~300MB) if you disable LinkedIn scraping.
+   - Env Vars: `PORT=8000` (Railway also injects PORT), `DISABLE_LINKEDIN=1`, other API keys.
+   - Start Command: leave empty (Docker CMD handles it).
+4. Exposed Port: Railway auto maps internal $PORT to public URL.
+5. Health Check Path: `/health`.
+
+Frontend (Static):
+Option A (Railway Static):
+- Add service -> Static Site -> Root path.
+- Build Command: `npm run build`.
+- Output Directory: `dist`.
+- Env Vars: `VITE_API_BASE=https://<backend-domain>`.
+
+Option B (Second Docker service):
+- Use root `Dockerfile` that builds and serves via Nginx (resulting container ~ small). Keep environment var `VITE_API_BASE` build-time (ARG+--build-arg) OR runtime by rewriting config (simpler: Static Site).
+
+Memory/Cost Tips:
+- If Chromium not required: set `DISABLE_LINKEDIN=1` + build arg `INSTALL_CHROME=0` -> reduces image size + RAM usage.
+- Gunicorn workers: start with `WORKERS=2` on 512MB; increase if CPU bound and memory allows.
+- Add `LOG_LEVEL=warning` to reduce log volume.
+
+Example Railway Env (Backend):
+```
+PORT=8000
+DISABLE_LINKEDIN=1
+WORKERS=2
+TIMEOUT=120
+OPENROUTER_API_KEY=...
+GOOGLE_API_KEY=...
+```
+
+Redeploy with new build args via Railway UI when toggling Chromium.
