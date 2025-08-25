@@ -23,9 +23,15 @@ DISABLE_LINKEDIN = os.getenv("DISABLE_LINKEDIN", "0") in {"1", "true", "yes", "o
 # App Setup
 # -----------------------------
 app = FastAPI()
+# Explicit CORS origins (override with CORS_ORIGINS env var comma separated)
+_default_origins = "http://localhost:5173,https://wms-virid-six.vercel.app"
+allowed_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    allow_origins=allowed_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
 )
 
 # Basic health check for load balancers / EB
