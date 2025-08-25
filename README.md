@@ -127,6 +127,49 @@ eb open
 - Health check: `GET /health` (configured via `.ebextensions` and Nginx snippet)
 - Files: see `backend/.ebextensions` for env/port/health settings
 
+## 🛠 CI/CD: Elastic Beanstalk Deployment (Backend)
+
+### GitHub Secrets Required
+Set these in your repository Settings > Secrets and variables > Actions:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_DEFAULT_REGION` (e.g. ap-south-1)
+
+### Workflow
+A GitHub Actions workflow at `.github/workflows/deploy-eb.yml` builds & deploys the backend on push to `main` using the EB CLI.
+
+### First-Time Manual Setup (if environment not yet created)
+```powershell
+cd backend
+pip install awsebcli
+# Initialize (choose Docker platform)
+eb init studentpilot-backend --platform Docker --region ap-south-1
+# Create environment (single instance)
+eb create studentpilot-backend-env --single --platform Docker --cname studentpilot-backend-env
+# (Optional) Set env vars
+eb setenv PORT=8000 CORS_ORIGINS=https://wms-virid-six.vercel.app,http://localhost:5173 DISABLE_LINKEDIN=1
+# Deploy
+ eb deploy
+```
+Once the environment exists, pushes to main auto-deploy.
+
+### Rollback
+```powershell
+cd backend
+eb list
+eb versions
+eb deploy studentpilot-backend-env --version <label>
+```
+
+### Local Test (same Gunicorn invocation)
+```powershell
+cd backend
+python -m venv .venv; . .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+set PORT=8000
+python -c "import uvicorn, main; uvicorn.run(main.app, host='0.0.0.0', port=8000)"
+```
+
 ## 🖼️ Screenshots
 
 ![Landing](docs/screenshots/landing.png)

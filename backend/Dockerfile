@@ -50,4 +50,4 @@ EXPOSE 8000
 
 # Hint: For Railway lightweight deploy use build args: INSTALL_CHROME=0 and env: DISABLE_LINKEDIN=1
 # Start with Gunicorn using Uvicorn workers; honor PORT/WORKERS/TIMEOUT env vars
-CMD ["sh", "-c", "gunicorn -c gunicorn_conf.py main:app"]
+CMD ["sh", "-c", "gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000} --workers ${WORKERS:-2} --timeout ${TIMEOUT:-120}"]
