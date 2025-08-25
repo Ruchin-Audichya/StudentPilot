@@ -1,0 +1,14 @@
+branch-defaults:
+  main:
+    environment: wheresmystipend-env-1
+    group_suffix: null
+environment-defaults:
+  wheresmystipend-env-1:
+    branch: null
+    repository: null
+global:
+  application_name: studentpilot-backend
+  default_ec2_keyname: null
+  default_platform: Docker
+  default_region: ap-south-1
+  sc: git
