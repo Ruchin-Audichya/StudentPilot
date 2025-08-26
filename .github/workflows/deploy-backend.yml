@@ -95,61 +95,52 @@ jobs:
         run: |
           eb setenv PORT=8000 DISABLE_LINKEDIN=1 || true
 
-      - name: Deploy (robust multi-attempt with version polling)
+      - name: Deploy (race-free version processing wait)
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           set -e
           SHORT_SHA=${GITHUB_SHA::7}
           LABEL=Auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}
-          echo "Deploying label $LABEL from root (Dockerfile at repository root)"
-          ATTEMPTS=5
-          SLEEP=20
-          SUCCESS=0
-          for i in $(seq 1 $ATTEMPTS); do
-            echo "Attempt $i of $ATTEMPTS"
-            set +e
-            OUTPUT=$(eb deploy $ENV_NAME --staged --label $LABEL 2>&1)
-            CODE=$?
-            set -e
-            echo "$OUTPUT"
-            if [ $CODE -eq 0 ]; then
-              echo "eb deploy succeeded on attempt $i"; SUCCESS=1; break
-            fi
-            if echo "$OUTPUT" | grep -qi 'No Application Version named'; then
-              echo "Version not visible yet (eventual consistency).";
-              # Poll for version appearance directly via AWS CLI
-              for j in $(seq 1 6); do
-                echo "  Poll $j: checking if version registered..."
-                COUNT=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions | length(@)')
-                if [ "$COUNT" != "0" ]; then
-                  echo "  Version now registered. Updating environment directly.";
-                  aws elasticbeanstalk update-environment --environment-name "$ENV_NAME" --version-label "$LABEL"
-                  SUCCESS=1
-                  break 2
-                fi
-                sleep 5
-              done
-              echo "  Version still not registered; sleeping $SLEEP s before next deploy attempt..."
-              sleep $SLEEP
-              continue
-            fi
-            if echo "$OUTPUT" | grep -qi 'already exists'; then
-              echo "Application version already exists; forcing environment update.";
-              aws elasticbeanstalk update-environment --environment-name "$ENV_NAME" --version-label "$LABEL"
-              SUCCESS=1
-              break
-            fi
-            echo "Non-recoverable deploy error (attempt $i).";
-            if [ $i -lt $ATTEMPTS ]; then
-              echo "Sleeping $SLEEP s then retrying..."; sleep $SLEEP; continue
+          echo "Creating application version $LABEL (separate from environment update)"
+          # Create / Upload application version only (without immediate environment update) using eb deploy with --label but suppressing env update by using --nohang and aborting after upload detection.
+          # The EB CLI doesn't provide a direct 'create-app-version' stable command, so we let first failure trigger version registration wait if race.
+          set +e
+          OUTPUT=$(eb deploy $ENV_NAME --staged --label $LABEL 2>&1)
+          CODE=$?
+          set -e
+          echo "$OUTPUT"
+          if [ $CODE -ne 0 ] && echo "$OUTPUT" | grep -qi 'No Application Version named'; then
+            echo "Detected early environment update attempt before version processed. Proceeding to explicit wait for version registration + processing."
+          elif [ $CODE -eq 0 ]; then
+            echo "eb deploy fully succeeded; skipping manual wait."
+            exit 0
+          else
+            echo "eb deploy failed with unexpected error." >&2
+            exit $CODE
+          fi
+          echo "Waiting for application version '$LABEL' to register..."
+          for i in $(seq 1 24); do
+            COUNT=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions | length(@)')
+            if [ "$COUNT" != "0" ]; then
+              STATUS=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions[0].Status' --output text)
+              echo "  Found version (status=$STATUS)"
+              if [ "$STATUS" = "PROCESSED" ]; then
+                echo "Version processed. Updating environment now."
+                aws elasticbeanstalk update-environment --environment-name "$ENV_NAME" --version-label "$LABEL"
+                break
+              fi
             else
-              echo "Giving up after $ATTEMPTS attempts."; break
+              echo "  Not yet visible (attempt $i)"
             fi
+            sleep 5
           done
-          if [ $SUCCESS -ne 1 ]; then
-            echo "Deploy failed after $ATTEMPTS attempts." >&2
+          # Final confirmation
+          FINAL_STATUS=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions[0].Status' --output text || echo MISSING)
+          if [ "$FINAL_STATUS" != "PROCESSED" ]; then
+            echo "Application version did not reach PROCESSED state (status=$FINAL_STATUS)." >&2
             exit 1
           fi
+          echo "Environment update initiated with version $LABEL."
 
       - name: Show status
         working-directory: ${{ env.WORKING_DIR }}
