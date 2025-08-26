@@ -79,6 +79,23 @@ jobs:
               fi
             fi
           fi
+          if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].Status' --output text 2>/dev/null | grep -q .; then
+            echo "Environment '$ENV_NAME' exists in account. Linking..."
+            # Attempt to associate local config; ignore failure (not fatal for deploy)
+            eb use $ENV_NAME || echo "Warning: eb use failed (continuing)."
+          else
+            echo "Environment '$ENV_NAME' does not exist; creating..."
+            if ! eb create $ENV_NAME --single --timeout 20; then
+              echo "Create command failed; re-checking existence via AWS CLI..."
+              if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].Status' --output text 2>/dev/null | grep -q .; then
+                echo "Environment now present after create failure; continuing." 
+              else
+                echo "Environment creation failed and environment not found." >&2
+                exit 1
+              fi
+            fi
+            eb use $ENV_NAME || true
+          fi
           eb use $ENV_NAME
 
       - name: Set env vars (backend)
