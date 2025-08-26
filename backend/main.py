@@ -101,7 +101,7 @@ buzzword_roles = set()
 # -----------------------------
 # Load Buzzwords CSV
 # -----------------------------
-csv_path = os.path.join(os.path.dirname(__file__), "btech_buzzwords.csv")
+csv_path = os.path.join(os.path.dirname(__file__), "data", "btech_buzzwords.csv")
 if os.path.exists(csv_path):
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
