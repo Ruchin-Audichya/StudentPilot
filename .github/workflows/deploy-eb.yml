@@ -17,25 +17,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Guard: no legacy EB options
+        run: |
+          echo "Scanning for forbidden ContainerPort / aws:elasticbeanstalk:container:docker options"
+          if grep -R "aws:elasticbeanstalk:container:docker" -n .ebextensions || grep -R "ContainerPort" -n .ebextensions; then
+            echo "Found legacy docker namespace or ContainerPort; fail." >&2
+            exit 1
+          fi
+          echo "Guard passed."
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
-
-      - name: Install EB CLI
-        run: pip install --upgrade awsebcli
-
-      - name: EB init (non-interactive, Docker AL2023)
-        run: |
-          APP_NAME=studentpilot-backend
-          eb init "$APP_NAME" -p "Docker" --region "${{ secrets.AWS_DEFAULT_REGION }}" || true
 
       - name: Create environment if missing
         run: |
@@ -64,7 +58,7 @@ jobs:
           CNAME=$(eb status "$ENV_NAME" | awk '/CNAME:/ {print $2}')
           echo "CNAME=$CNAME"
           curl -fsS http://$CNAME/health || (echo "Health failed" && exit 1)
-          curl -s -X POST http://$CNAME/api/search -H 'Content-Type: application/json' -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 300 || truename: DISABLED legacy EB workflow (do not use)
+          curl -s -X POST http://$CNAME/api/search -H 'Content-Type: application/json' -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 300 || true
 
 # This file is intentionally disabled to avoid duplicate deployments.
 # Canonical workflow: .github/workflows/deploy-backend.yml
