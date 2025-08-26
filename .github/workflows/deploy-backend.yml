@@ -20,9 +20,9 @@ jobs:
       AWS_REGION: ap-south-1
       AWS_DEFAULT_REGION: ap-south-1
       APP_NAME: studentpilot-backend
-      ENV_NAME: wheresmystipend-env-1
+      ENV_NAME: WheresMyStipend-env-1
       PORT: 8000
-      WORKING_DIR: backend
+      WORKING_DIR: .
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,10 +56,15 @@ jobs:
           pip install awscli --quiet
           aws sts get-caller-identity
 
-      - name: Ensure EB app/env
+      - name: Ensure EB app/env (root Dockerfile)
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           set -e
+          # If previous config exists inside backend/ migrate it
+          if [ ! -d .elasticbeanstalk ] && [ -d backend/.elasticbeanstalk ]; then
+            echo "Migrating existing EB config from backend/.elasticbeanstalk to root";
+            cp -R backend/.elasticbeanstalk .
+          fi
           if [ ! -d .elasticbeanstalk ]; then
             eb init $APP_NAME --region $AWS_REGION --platform Docker
           fi
@@ -90,11 +95,29 @@ jobs:
         run: |
           eb setenv PORT=8000 DISABLE_LINKEDIN=1 || true
 
-      - name: Deploy
+      - name: Deploy (with retry if version race)
         working-directory: ${{ env.WORKING_DIR }}
         run: |
+          set -e
           SHORT_SHA=${GITHUB_SHA::7}
-          eb deploy $ENV_NAME --staged --label Auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}
+          LABEL=Auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}
+          echo "Deploying label $LABEL from root (Dockerfile at repository root)"
+          set +e
+          OUTPUT=$(eb deploy $ENV_NAME --staged --label $LABEL 2>&1)
+          CODE=$?
+          echo "$OUTPUT"
+          if [ $CODE -ne 0 ] && echo "$OUTPUT" | grep -qi 'No Application Version named'; then
+            echo "Encountered version lookup race. Waiting 15s and retrying..."
+            sleep 15
+            OUTPUT2=$(eb deploy $ENV_NAME --staged --label $LABEL 2>&1)
+            CODE=$?
+            echo "$OUTPUT2"
+          fi
+          set -e
+          if [ $CODE -ne 0 ]; then
+            echo "Deploy failed after retry." >&2
+            exit $CODE
+          fi
 
       - name: Show status
         working-directory: ${{ env.WORKING_DIR }}
