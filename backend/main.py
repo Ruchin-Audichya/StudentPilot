@@ -4,7 +4,13 @@ import os
 import io
 import csv
 import re
-import fitz
+# Optional PDF parsing dependency
+try:
+    import fitz  # PyMuPDF
+    _PDF_ENABLED = True
+except Exception:
+    fitz = None  # type: ignore
+    _PDF_ENABLED = False
 import docx
 from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile
@@ -24,7 +30,10 @@ DISABLE_LINKEDIN = os.getenv("DISABLE_LINKEDIN", "0") in {"1", "true", "yes", "o
 # -----------------------------
 app = FastAPI()
 # Explicit CORS origins (override with CORS_ORIGINS env var comma separated)
-_default_origins = "http://localhost:5173,https://wms-virid-six.vercel.app"
+_default_origins = (
+    "http://localhost:5173,https://wms-virid-six.vercel.app,"  # existing
+    "http://localhost:8080,http://127.0.0.1:8080,http://127.0.0.1:5173"
+)
 allowed_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +42,21 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+# Simple logging middleware (enabled when DEBUG_LOG=1)
+if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
+    import time, logging
+    logging.basicConfig(level=logging.INFO)
+    @app.middleware("http")
+    async def _log_requests(request, call_next):
+        start = time.time()
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            dur_ms = (time.time()-start)*1000
+            logging.info("%s %s -> %s %.1fms", request.method, request.url.path, getattr(response,'status_code', '?'), dur_ms)
 
 # Basic health check for load balancers / EB
 @app.get("/health")
@@ -411,33 +435,5 @@ async def upload_resume(file: UploadFile = File(...)):
     fname = file.filename.lower()
 
     if fname.endswith(".pdf"):
-        with fitz.open(stream=content, filetype="pdf") as pdf:
-            for page in pdf:
-                text += page.get_text()
-    elif fname.endswith(".docx"):
-        doc = docx.Document(io.BytesIO(content))
-        for para in doc.paragraphs:
-            text += para.text + "\n"
-    elif fname.endswith(".txt"):
-        text = content.decode("utf-8", errors="ignore")
-    else:
-        return {"error": "Unsupported format"}
-
-    resume_text = _normalize(text)
-    resume_profile = {
-        "skills": set(_extract_keywords(resume_text)),
-        "roles": set(_extract_roles(resume_text)),
-        "location": _extract_location(resume_text),
-    }
-    return {
-        "message": "Resume uploaded",
-        "skills": list(resume_profile["skills"]),
-        "roles": list(resume_profile["roles"])
-    }
-
-# -----------------------------
-# Dev server
-# -----------------------------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=int(os.getenv("PORT", 8000)))
+        if not _PDF_ENABLED:
+            return {"error": "PDF parsing requires PyMuPDF (install with: pip install PyMuPDF)."}
