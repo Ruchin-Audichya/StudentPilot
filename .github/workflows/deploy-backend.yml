@@ -63,23 +63,27 @@ jobs:
           if [ ! -d .elasticbeanstalk ]; then
             eb init $APP_NAME --region $AWS_REGION --platform Docker
           fi
-          # Detect environment via AWS CLI (no attempt to create if it already exists)
-          if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].EnvironmentName' --output text 2>/dev/null | grep -q "$ENV_NAME"; then
-            echo "Environment '$ENV_NAME' already exists; skipping create."
-            eb use $ENV_NAME || echo "Warning: eb use failed (continuing)."
+          # Robust existence check using eb status (fast) – if fails, we'll attempt create
+          if eb status $ENV_NAME >/dev/null 2>&1; then
+            echo "Environment '$ENV_NAME' already exists (eb status ok)."
           else
-            echo "Environment '$ENV_NAME' not found; creating..."
-            if ! eb create $ENV_NAME --single --timeout 20; then
-              echo "Create failed; confirming existence..."
-              if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].EnvironmentName' --output text 2>/dev/null | grep -q "$ENV_NAME"; then
-                echo "Environment appeared after create failure; continuing."
+            echo "Environment '$ENV_NAME' not detected via eb status; attempting create..."
+            set +e
+            CREATE_OUT=$(eb create $ENV_NAME --single --timeout 20 2>&1)
+            CREATE_CODE=$?
+            set -e
+            echo "$CREATE_OUT"
+            if [ $CREATE_CODE -ne 0 ]; then
+              if echo "$CREATE_OUT" | grep -qi 'already exists'; then
+                echo "Create reported 'already exists' – treating as success."
               else
-                echo "Environment creation failed and environment still absent." >&2
+                echo "Environment create failed (unexpected)." >&2
                 exit 1
               fi
             fi
-            eb use $ENV_NAME || true
           fi
+          # Associate local config; ignore failures
+            eb use $ENV_NAME || echo "Warning: eb use failed (continuing)."
 
       - name: Set env vars (backend)
         working-directory: ${{ env.WORKING_DIR }}
