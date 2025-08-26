@@ -63,8 +63,21 @@ jobs:
           if [ ! -d .elasticbeanstalk ]; then
             eb init $APP_NAME --region $AWS_REGION --platform Docker
           fi
-          if ! eb list 2>/dev/null | grep -qw "$ENV_NAME"; then
-            eb create $ENV_NAME --single --timeout 20
+          # Check environment existence using 'eb status'; more reliable than parsing 'eb list'
+          if eb status $ENV_NAME >/dev/null 2>&1; then
+            echo "EB environment '$ENV_NAME' already exists. Skipping create."
+          else
+            echo "Creating EB environment '$ENV_NAME'..."
+            # Don't fail build if a race condition creates it between check and create
+            if ! eb create $ENV_NAME --single --timeout 20; then
+              echo "Create reported failure; checking if environment now exists anyway..."
+              if eb status $ENV_NAME >/dev/null 2>&1; then
+                echo "Environment exists after create attempt; continuing."
+              else
+                echo "Environment creation truly failed." >&2
+                exit 1
+              fi
+            fi
           fi
           eb use $ENV_NAME
 
