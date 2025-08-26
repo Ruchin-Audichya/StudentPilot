@@ -37,15 +37,38 @@ jobs:
           aws sts get-caller-identity
           aws configure list
 
-      - name: Init EB (idempotent)
+      - name: Debug workspace and EB setup
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Files in current dir:"
+          ls -la
+          echo "EB config:"
+          cat .elasticbeanstalk/config.yml || echo "No EB config found"
+          echo "Docker file exists:"
+          ls -la Dockerfile || echo "No Dockerfile"
+          echo ".ebextensions contents:"
+          ls -la .ebextensions/ || echo "No .ebextensions"
+
+      - name: Init EB (clean setup)
         run: |
           APP_NAME=studentpilot-backend
-          eb init "$APP_NAME" -p "Docker" --region "${{ secrets.AWS_DEFAULT_REGION }}" || true
+          ENV_NAME=studentpilot-backend-env
+          # Force clean EB setup to avoid old environment conflicts
+          rm -rf .elasticbeanstalk/config.yml || true
+          eb init "$APP_NAME" -p "Docker" --region "${{ secrets.AWS_DEFAULT_REGION }}"
+          # Set the environment we want to use
+          eb use "$ENV_NAME" || echo "Environment $ENV_NAME not found, will create"
 
       - name: Ensure environment exists
         run: |
           ENV_NAME=studentpilot-backend-env
-          eb status "$ENV_NAME" >/dev/null 2>&1 || eb create "$ENV_NAME" --single --platform "Docker" --cname "$ENV_NAME"
+          if ! eb status "$ENV_NAME" >/dev/null 2>&1; then
+            echo "Creating new environment: $ENV_NAME"
+            eb create "$ENV_NAME" --single --platform "Docker" --cname "$ENV_NAME" --timeout 20
+          else
+            echo "Environment $ENV_NAME already exists"
+            eb use "$ENV_NAME"
+          fi
 
       - name: Guard: no legacy EB options
         run: |

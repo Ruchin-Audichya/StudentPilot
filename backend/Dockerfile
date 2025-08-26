@@ -38,12 +38,12 @@ RUN if [ "$INSTALL_CHROME" = "1" ]; then \
 ENV CHROME_BIN=/usr/bin/chromium \
     CHROMEDRIVER=/usr/bin/chromedriver
 
-# Python dependencies (single layer). Use --require-hashes later if you lock.
-COPY backend/requirements.txt /app/requirements.txt
+# Python dependencies (single layer). Context is backend/ so paths are local.
+COPY requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # Copy application source
-COPY backend/ /app/
+COPY . /app/
 
 # Create non-root user AFTER dependencies to leverage layer cache on code changes
 RUN useradd -ms /bin/bash appuser && chown -R appuser:appuser /app
