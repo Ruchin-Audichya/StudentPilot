@@ -63,40 +63,23 @@ jobs:
           if [ ! -d .elasticbeanstalk ]; then
             eb init $APP_NAME --region $AWS_REGION --platform Docker
           fi
-          # Check environment existence using 'eb status'; more reliable than parsing 'eb list'
-          if eb status $ENV_NAME >/dev/null 2>&1; then
-            echo "EB environment '$ENV_NAME' already exists. Skipping create."
-          else
-            echo "Creating EB environment '$ENV_NAME'..."
-            # Don't fail build if a race condition creates it between check and create
-            if ! eb create $ENV_NAME --single --timeout 20; then
-              echo "Create reported failure; checking if environment now exists anyway..."
-              if eb status $ENV_NAME >/dev/null 2>&1; then
-                echo "Environment exists after create attempt; continuing."
-              else
-                echo "Environment creation truly failed." >&2
-                exit 1
-              fi
-            fi
-          fi
-          if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].Status' --output text 2>/dev/null | grep -q .; then
-            echo "Environment '$ENV_NAME' exists in account. Linking..."
-            # Attempt to associate local config; ignore failure (not fatal for deploy)
+          # Detect environment via AWS CLI (no attempt to create if it already exists)
+          if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].EnvironmentName' --output text 2>/dev/null | grep -q "$ENV_NAME"; then
+            echo "Environment '$ENV_NAME' already exists; skipping create."
             eb use $ENV_NAME || echo "Warning: eb use failed (continuing)."
           else
-            echo "Environment '$ENV_NAME' does not exist; creating..."
+            echo "Environment '$ENV_NAME' not found; creating..."
             if ! eb create $ENV_NAME --single --timeout 20; then
-              echo "Create command failed; re-checking existence via AWS CLI..."
-              if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].Status' --output text 2>/dev/null | grep -q .; then
-                echo "Environment now present after create failure; continuing." 
+              echo "Create failed; confirming existence..."
+              if aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].EnvironmentName' --output text 2>/dev/null | grep -q "$ENV_NAME"; then
+                echo "Environment appeared after create failure; continuing."
               else
-                echo "Environment creation failed and environment not found." >&2
+                echo "Environment creation failed and environment still absent." >&2
                 exit 1
               fi
             fi
             eb use $ENV_NAME || true
           fi
-          eb use $ENV_NAME
 
       - name: Set env vars (backend)
         working-directory: ${{ env.WORKING_DIR }}
