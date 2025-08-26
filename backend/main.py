@@ -61,6 +61,10 @@ if _cors_env == "*":
     )
 else:
     allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+    # Tighten to explicit frontend origin if FRONTEND_ORIGIN set
+    frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
+    if frontend_origin and frontend_origin not in allowed_origins:
+        allowed_origins.append(frontend_origin)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
