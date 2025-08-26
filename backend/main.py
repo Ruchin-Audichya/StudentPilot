@@ -437,3 +437,62 @@ async def upload_resume(file: UploadFile = File(...)):
     if fname.endswith(".pdf"):
         if not _PDF_ENABLED:
             return {"error": "PDF parsing requires PyMuPDF (install with: pip install PyMuPDF)."}
+        try:
+            with fitz.open(stream=content, filetype="pdf") as doc:  # type: ignore
+                for page in doc:
+                    text += page.get_text()
+        except Exception as e:
+            return {"error": f"Failed to parse PDF: {e}"}
+    elif fname.endswith(".docx"):
+        try:
+            document = docx.Document(io.BytesIO(content))
+            text = "\n".join(p.text for p in document.paragraphs)
+        except Exception as e:
+            return {"error": f"Failed to parse DOCX: {e}"}
+    elif any(fname.endswith(ext) for ext in (".txt", ".md")):
+        try:
+            text = content.decode("utf-8", errors="ignore")
+        except Exception as e:
+            return {"error": f"Failed to read text file: {e}"}
+    else:
+        # Generic attempt: treat as text
+        try:
+            text = content.decode("utf-8", errors="ignore")
+        except Exception:
+            return {"error": "Unsupported file type. Please upload PDF, DOCX or TXT."}
+
+    # Basic cleanup
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return {"error": "No readable text extracted from resume."}
+
+    resume_text = text
+
+    # Extract profile info
+    extracted_skills = set(_extract_keywords(text, max_terms=32))
+
+    # Simple extra skill harvesting (common tech tokens)
+    tech_tokens = re.findall(r"\b([A-Za-z][A-Za-z0-9+#\.]{1,20})\b", text.lower())
+    tech_whitelist = {
+        "python","java","javascript","typescript","react","node","django","fastapi","sql","mysql","postgresql","mongodb","docker","kubernetes","aws","azure","gcp","pandas","numpy","scikit-learn","tensorflow","pytorch","html","css","tailwind","git","linux","excel","powerbi","power","bi","mlflow","keras","flask","redis","next.js","next","jira","c++","c","go"}
+    for t in tech_tokens:
+        if t in tech_whitelist and len(extracted_skills) < 64:
+            extracted_skills.add(t)
+
+    extracted_roles = _extract_roles(text)
+    loc = _extract_location(text)
+
+    # Update global profile (merge to keep previously inferred data)
+    resume_profile["skills"] = set(extracted_skills)
+    resume_profile["roles"] = set(extracted_roles) or resume_profile.get("roles", set())
+    if loc:
+        resume_profile["location"] = loc
+
+    return {
+        "success": True,
+        "filename": file.filename,
+        "skills_count": len(resume_profile["skills"]),
+        "roles": sorted(list(resume_profile["roles"]))[:10],
+        "location": resume_profile.get("location"),
+        "sample_text": resume_text[:400]
+    }
