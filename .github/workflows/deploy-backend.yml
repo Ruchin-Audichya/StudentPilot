@@ -95,52 +95,84 @@ jobs:
         run: |
           eb setenv PORT=8000 DISABLE_LINKEDIN=1 || true
 
-      - name: Deploy (race-free version processing wait)
+      - name: Build minimal application bundle
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           set -e
           SHORT_SHA=${GITHUB_SHA::7}
           LABEL=Auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}
-          echo "Creating application version $LABEL (separate from environment update)"
-          # Create / Upload application version only (without immediate environment update) using eb deploy with --label but suppressing env update by using --nohang and aborting after upload detection.
-          # The EB CLI doesn't provide a direct 'create-app-version' stable command, so we let first failure trigger version registration wait if race.
+          echo "Preparing minimal bundle for version $LABEL"
+          rm -rf eb_bundle
+            mkdir -p eb_bundle
+          # Only include what Elastic Beanstalk needs for single Docker: Dockerfile + backend code (+ optional .ebextensions)
+          cp Dockerfile eb_bundle/
+          cp -R backend eb_bundle/backend
+          if [ -d .ebextensions ]; then
+            cp -R .ebextensions eb_bundle/.ebextensions
+          fi
+          (cd eb_bundle && zip -r ../$LABEL.zip .)
+          ls -lh $LABEL.zip
+          echo "LABEL=$LABEL" >> $GITHUB_ENV
+          echo "BUNDLE_ZIP=$LABEL.zip" >> $GITHUB_ENV
+
+      - name: Upload & register application version
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          set -e
+          LABEL=${LABEL:?missing}
+          BUNDLE_ZIP=${BUNDLE_ZIP:?missing}
+          echo "Ensuring storage bucket exists"
+          BUCKET=$(aws elasticbeanstalk create-storage-location --query S3Bucket --output text)
+          echo "Using bucket: $BUCKET"
+          S3_KEY=$APP_NAME/$LABEL.zip
+          aws s3 cp $BUNDLE_ZIP s3://$BUCKET/$S3_KEY
+          echo "Creating application version $LABEL from s3://$BUCKET/$S3_KEY"
           set +e
-          OUTPUT=$(eb deploy $ENV_NAME --staged --label $LABEL 2>&1)
+          CREATE_OUT=$(aws elasticbeanstalk create-application-version --application-name $APP_NAME --version-label $LABEL --source-bundle S3Bucket=$BUCKET,S3Key=$S3_KEY 2>&1)
           CODE=$?
           set -e
-          echo "$OUTPUT"
-          if [ $CODE -ne 0 ] && echo "$OUTPUT" | grep -qi 'No Application Version named'; then
-            echo "Detected early environment update attempt before version processed. Proceeding to explicit wait for version registration + processing."
-          elif [ $CODE -eq 0 ]; then
-            echo "eb deploy fully succeeded; skipping manual wait."
-            exit 0
-          else
-            echo "eb deploy failed with unexpected error." >&2
-            exit $CODE
-          fi
-          echo "Waiting for application version '$LABEL' to register..."
-          for i in $(seq 1 24); do
-            COUNT=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions | length(@)')
-            if [ "$COUNT" != "0" ]; then
-              STATUS=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions[0].Status' --output text)
-              echo "  Found version (status=$STATUS)"
-              if [ "$STATUS" = "PROCESSED" ]; then
-                echo "Version processed. Updating environment now."
-                aws elasticbeanstalk update-environment --environment-name "$ENV_NAME" --version-label "$LABEL"
-                break
-              fi
+          echo "$CREATE_OUT"
+          if [ $CODE -ne 0 ]; then
+            if echo "$CREATE_OUT" | grep -qi 'already exists'; then
+              echo "Version already exists; continuing.";
             else
-              echo "  Not yet visible (attempt $i)"
+              echo "Failed to create application version." >&2; exit $CODE;
+            fi
+          fi
+
+      - name: Wait for application version to be PROCESSED
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          set -e
+          LABEL=${LABEL:?missing}
+          echo "Waiting for version $LABEL to reach PROCESSED status"
+          MAX_ATTEMPTS=120   # up to ~10 minutes
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            STATUS=$(aws elasticbeanstalk describe-application-versions --application-name $APP_NAME --version-labels $LABEL --query 'ApplicationVersions[0].Status' --output text 2>/dev/null || echo MISSING)
+            echo "Attempt $i: status=$STATUS"
+            if [ "$STATUS" = "PROCESSED" ]; then
+              echo "Version processed."; break
+            fi
+            if [ "$STATUS" = "FAILED" ]; then
+              echo "Version processing failed." >&2
+              exit 1
             fi
             sleep 5
           done
-          # Final confirmation
-          FINAL_STATUS=$(aws elasticbeanstalk describe-application-versions --application-name "$APP_NAME" --version-labels "$LABEL" --query 'ApplicationVersions[0].Status' --output text || echo MISSING)
+          FINAL_STATUS=$(aws elasticbeanstalk describe-application-versions --application-name $APP_NAME --version-labels $LABEL --query 'ApplicationVersions[0].Status' --output text 2>/dev/null || echo MISSING)
           if [ "$FINAL_STATUS" != "PROCESSED" ]; then
-            echo "Application version did not reach PROCESSED state (status=$FINAL_STATUS)." >&2
+            echo "Version never reached PROCESSED (final=$FINAL_STATUS)." >&2
             exit 1
           fi
-          echo "Environment update initiated with version $LABEL."
+
+      - name: Update environment to new version
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          set -e
+          LABEL=${LABEL:?missing}
+          echo "Updating environment $ENV_NAME to version $LABEL"
+          aws elasticbeanstalk update-environment --environment-name $ENV_NAME --version-label $LABEL
+          echo "Environment update command submitted."
 
       - name: Show status
         working-directory: ${{ env.WORKING_DIR }}
@@ -170,4 +202,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: eb-cname
-          path: backend/cname.txt
+          path: cname.txt
