@@ -63,12 +63,19 @@ jobs:
           else
             echo "Creating new environment: $ENV_NAME"
             eb create "$ENV_NAME" \
-              --platform "Docker running on 64bit Amazon Linux 2023" \
-              --single-instance \
+              --platform "Docker" \
+              --instance-types t3.micro \
               --timeout 25 \
               --cname "$ENV_NAME" || {
-                echo "Create failed, trying to use existing..."
-                eb use "$ENV_NAME"
+                echo "Create failed, checking if it exists now..."
+                sleep 10
+                if eb status "$ENV_NAME" 2>/dev/null; then
+                  echo "Environment created successfully, using it"
+                  eb use "$ENV_NAME"
+                else
+                  echo "Environment creation failed completely"
+                  exit 1
+                fi
               }
           fi
 
