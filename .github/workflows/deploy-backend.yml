@@ -19,7 +19,7 @@ jobs:
     env:
       AWS_REGION: ap-south-1
       AWS_DEFAULT_REGION: ap-south-1
-      APP_NAME: studentpilot-backend
+      APP_NAME: _DYNAMIC_            # Will be discovered automatically
       ENV_NAME: WheresMyStipend-env-1
       PORT: 8000
       WORKING_DIR: .
@@ -44,159 +44,90 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Debug region/keys presence
+      - name: Debug AWS identity & region
         run: |
+          aws sts get-caller-identity
           echo "AWS_REGION=$AWS_REGION"
           echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
-          test -n "$AWS_ACCESS_KEY_ID" && echo "Access key present" || echo "Access key MISSING"
-          test -n "$AWS_SECRET_ACCESS_KEY" && echo "Secret key present" || echo "Secret key MISSING"
+          echo "Credentials present? $( if [ -n "$AWS_ACCESS_KEY_ID" ]; then echo yes; else echo no; fi )"
 
-      - name: Verify AWS identity
+      - name: Discover Application Name
+        id: discover
         run: |
-          pip install awscli --quiet
-          aws sts get-caller-identity
-
-      - name: Ensure EB app/env (root Dockerfile)
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          set -e
-          # If previous config exists inside backend/ migrate it
-          if [ ! -d .elasticbeanstalk ] && [ -d backend/.elasticbeanstalk ]; then
-            echo "Migrating existing EB config from backend/.elasticbeanstalk to root";
-            cp -R backend/.elasticbeanstalk .
-          fi
-          if [ ! -d .elasticbeanstalk ]; then
-            eb init $APP_NAME --region $AWS_REGION --platform Docker
-          fi
-          # Robust existence check using eb status (fast) – if fails, we'll attempt create
-          if eb status $ENV_NAME >/dev/null 2>&1; then
-            echo "Environment '$ENV_NAME' already exists (eb status ok)."
+          APP=$(aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" --query 'Environments[0].ApplicationName' --output text 2>/dev/null || echo NONE)
+          if [ "$APP" = "NONE" ] || [ "$APP" = "None" ] || [ "$APP" = "null" ]; then
+            APP=StudentPilotApp
+            echo "Environment not found yet; defaulting application to $APP"
           else
-            echo "Environment '$ENV_NAME' not detected via eb status; attempting create..."
+            echo "Detected existing application: $APP"
+          fi
+          echo "APP_NAME=$APP" >> $GITHUB_ENV
+          echo "APP_NAME=$APP"
+          # Patch existing config if present
+          if [ -f .elasticbeanstalk/config.yml ]; then
+            if ! grep -q "application_name: $APP" .elasticbeanstalk/config.yml; then
+              sed -i "s/application_name: .*/application_name: $APP/" .elasticbeanstalk/config.yml || true
+            fi
+          fi
+
+      - name: Init EB (idempotent)
+        run: |
+          if [ ! -d .elasticbeanstalk ]; then
+            eb init "$APP_NAME" --region "$AWS_REGION" --platform Docker
+          else
+            echo "EB already initialized"
+          fi
+
+      - name: Ensure environment exists
+        run: |
+          if eb status "$ENV_NAME" >/dev/null 2>&1; then
+            echo "Environment exists."
+          else
+            echo "Creating environment $ENV_NAME under app $APP_NAME"
             set +e
-            CREATE_OUT=$(eb create $ENV_NAME --single --timeout 20 2>&1)
-            CREATE_CODE=$?
+            OUT=$(eb create "$ENV_NAME" --single --timeout 40 2>&1)
+            CODE=$?
             set -e
-            echo "$CREATE_OUT"
-            if [ $CREATE_CODE -ne 0 ]; then
-              if echo "$CREATE_OUT" | grep -qi 'already exists'; then
-                echo "Create reported 'already exists' – treating as success."
+            echo "$OUT"
+            if [ $CODE -ne 0 ]; then
+              if echo "$OUT" | grep -qi 'already exists'; then
+                echo "Create reported already exists; continuing"
               else
-                echo "Environment create failed (unexpected)." >&2
-                exit 1
+                echo "Failed to create environment" >&2; exit 1
               fi
             fi
           fi
-          # Associate local config; ignore failures
-            eb use $ENV_NAME || echo "Warning: eb use failed (continuing)."
+          eb use "$ENV_NAME" || true
 
-      - name: Set env vars (backend)
-        working-directory: ${{ env.WORKING_DIR }}
+      - name: Set environment variables
         run: |
           eb setenv PORT=8000 DISABLE_LINKEDIN=1 || true
 
-      - name: Build minimal application bundle
-        working-directory: ${{ env.WORKING_DIR }}
+      - name: Deploy (standard eb deploy)
+        run: |
+          LABEL=build-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}
+          echo "Deploying label $LABEL"
+          eb deploy "$ENV_NAME" --label "$LABEL" --staged
+
+      - name: Show status & health
+        run: |
+          eb status "$ENV_NAME" || true
+          eb health "$ENV_NAME" --refresh || true
+
+      - name: Smoke test API endpoints
         run: |
           set -e
-          SHORT_SHA=${GITHUB_SHA::7}
-          LABEL=Auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}
-          echo "Preparing minimal bundle for version $LABEL"
-          rm -rf eb_bundle
-            mkdir -p eb_bundle
-          # Only include what Elastic Beanstalk needs for single Docker: Dockerfile + backend code (+ optional .ebextensions)
-          cp Dockerfile eb_bundle/
-          cp -R backend eb_bundle/backend
-          if [ -d .ebextensions ]; then
-            cp -R .ebextensions eb_bundle/.ebextensions
-          fi
-          (cd eb_bundle && zip -r ../$LABEL.zip .)
-          ls -lh $LABEL.zip
-          echo "LABEL=$LABEL" >> $GITHUB_ENV
-          echo "BUNDLE_ZIP=$LABEL.zip" >> $GITHUB_ENV
-
-      - name: Upload & register application version
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          set -e
-          LABEL=${LABEL:?missing}
-          BUNDLE_ZIP=${BUNDLE_ZIP:?missing}
-          echo "Ensuring storage bucket exists"
-          BUCKET=$(aws elasticbeanstalk create-storage-location --query S3Bucket --output text)
-          echo "Using bucket: $BUCKET"
-          S3_KEY=$APP_NAME/$LABEL.zip
-          aws s3 cp $BUNDLE_ZIP s3://$BUCKET/$S3_KEY
-          echo "Creating application version $LABEL from s3://$BUCKET/$S3_KEY"
-          set +e
-          CREATE_OUT=$(aws elasticbeanstalk create-application-version --application-name $APP_NAME --version-label $LABEL --source-bundle S3Bucket=$BUCKET,S3Key=$S3_KEY 2>&1)
-          CODE=$?
-          set -e
-          echo "$CREATE_OUT"
-          if [ $CODE -ne 0 ]; then
-            if echo "$CREATE_OUT" | grep -qi 'already exists'; then
-              echo "Version already exists; continuing.";
-            else
-              echo "Failed to create application version." >&2; exit $CODE;
-            fi
-          fi
-
-      - name: Wait for application version to be PROCESSED
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          set -e
-          LABEL=${LABEL:?missing}
-          echo "Waiting for version $LABEL to reach PROCESSED status"
-          MAX_ATTEMPTS=120   # up to ~10 minutes
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            STATUS=$(aws elasticbeanstalk describe-application-versions --application-name $APP_NAME --version-labels $LABEL --query 'ApplicationVersions[0].Status' --output text 2>/dev/null || echo MISSING)
-            echo "Attempt $i: status=$STATUS"
-            if [ "$STATUS" = "PROCESSED" ]; then
-              echo "Version processed."; break
-            fi
-            if [ "$STATUS" = "FAILED" ]; then
-              echo "Version processing failed." >&2
-              exit 1
-            fi
-            sleep 5
-          done
-          FINAL_STATUS=$(aws elasticbeanstalk describe-application-versions --application-name $APP_NAME --version-labels $LABEL --query 'ApplicationVersions[0].Status' --output text 2>/dev/null || echo MISSING)
-          if [ "$FINAL_STATUS" != "PROCESSED" ]; then
-            echo "Version never reached PROCESSED (final=$FINAL_STATUS)." >&2
-            exit 1
-          fi
-
-      - name: Update environment to new version
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          set -e
-          LABEL=${LABEL:?missing}
-          echo "Updating environment $ENV_NAME to version $LABEL"
-          aws elasticbeanstalk update-environment --environment-name $ENV_NAME --version-label $LABEL
-          echo "Environment update command submitted."
-
-      - name: Show status
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          eb status $ENV_NAME || true
-          eb health $ENV_NAME --refresh || true
-
-      - name: Output CNAME
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          eb status $ENV_NAME | grep CNAME || true
-
-      - name: Smoke test (health & sample search)
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          set -e
-          CNAME=$(eb status $ENV_NAME | awk '/CNAME:/ {print $2}')
-          if [ -z "$CNAME" ]; then echo "Could not determine CNAME"; exit 1; fi
-          ORIGIN=https://$CNAME
+          CNAME=$(eb status "$ENV_NAME" | awk '/CNAME:/ {print $2}')
+          if [ -z "$CNAME" ]; then echo "CNAME not found"; exit 1; fi
           echo "CNAME=$CNAME" | tee cname.txt
-          echo "Health:" && curl -fsS $ORIGIN/health || (echo "Health check failed" && exit 1)
-          echo "Sample search:" && curl -s -X POST "$ORIGIN/api/search" -H 'Content-Type: application/json' \
-            -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 400 || true
-          echo "Done." 
+          ORIGIN="http://$CNAME"
+          echo "Health:"; curl -fsS "$ORIGIN/health" | head -c 200
+          echo; echo "Search:"; curl -s -X POST "$ORIGIN/api/search" -H 'Content-Type: application/json' \
+            -d '{"query":"software engineer","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 400 || true
+          # Optional chat test (won't fail build if missing API key)
+          echo; echo "Chat (optional):"; curl -s -X POST "$ORIGIN/api/chat" -H 'Content-Type: application/json' \
+            -d '{"message":"Hello"}' | head -c 400 || true
+          echo; echo "Smoke tests completed"
 
       - name: Upload CNAME artifact
         uses: actions/upload-artifact@v4
