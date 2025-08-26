@@ -11,9 +11,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const segments = (req.query.path as string[] | undefined) || [];
-  const targetPath = segments.join('/');
-  const url = `${ORIGIN}/${targetPath}`;
+  // Vercel catch-all param can be a string (single segment) or string[] (multiple)
+  const raw = (req.query as any).path;
+  let targetPath = '';
+  if (Array.isArray(raw)) targetPath = raw.join('/');
+  else if (typeof raw === 'string') targetPath = raw;
+  const url = targetPath ? `${ORIGIN}/${targetPath}` : `${ORIGIN}`;
 
   try {
     // Collect body (works for JSON, multipart, etc.)

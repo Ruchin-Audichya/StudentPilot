@@ -1,4 +1,4 @@
-name: Deploy Backend to Elastic Beanstalk
+name: Deploy Backend to EB + Ping Vercel
 
 on:
   push:
@@ -17,33 +17,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Guard: no legacy EB options
-        run: |
-          echo "Scanning for forbidden ContainerPort / aws:elasticbeanstalk:container:docker options"
-          if grep -R "aws:elasticbeanstalk:container:docker" -n .ebextensions || grep -R "ContainerPort" -n .ebextensions; then
-            echo "Found legacy docker namespace or ContainerPort; fail." >&2
-            exit 1
-          fi
-          echo "Guard passed."
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Create environment if missing
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Install EB CLI
+        run: pip install --upgrade awsebcli
+
+      - name: Debug AWS identity & region
+        run: |
+          aws sts get-caller-identity
+          aws configure list
+
+      - name: Init EB (idempotent)
+        run: |
+          APP_NAME=studentpilot-backend
+          eb init "$APP_NAME" -p "Docker" --region "${{ secrets.AWS_DEFAULT_REGION }}" || true
+
+      - name: Ensure environment exists
         run: |
           ENV_NAME=studentpilot-backend-env
-          if ! eb status "$ENV_NAME" >/dev/null 2>&1; then
-            eb create "$ENV_NAME" --single --platform "Docker" --cname "$ENV_NAME"
-          fi
+          eb status "$ENV_NAME" >/dev/null 2>&1 || eb create "$ENV_NAME" --single --platform "Docker" --cname "$ENV_NAME"
 
-      - name: Set/refresh env vars
+      - name: Guard: no legacy EB options
+        run: |
+          if grep -RniE "aws:elasticbeanstalk:container:docker|ContainerPort" .; then
+            echo "::error::Found legacy EB Docker namespace (ContainerPort). Remove it."; exit 1; fi
+
+      - name: Set environment variables
         run: |
           eb use studentpilot-backend-env
-          eb setenv PORT=8000 WORKERS=2 TIMEOUT=120
+          eb setenv PORT=8000 FRONTEND_ORIGIN=https://wms-virid-six.vercel.app
 
-      - name: Deploy
+      - name: Deploy (standard eb deploy)
         env:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
@@ -52,25 +66,27 @@ jobs:
           echo "LABEL=$LABEL"
           eb deploy --label "$LABEL" --staged
 
+      - name: Show status & health
+        run: |
+          eb status
+          eb health
+
+      - name: Get EB CNAME (URL) and save
+        id: eburl
+        run: |
+          URL=$(eb status | sed -n 's/^ *CNAME: *//p' | tr -d '\r')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "EB_URL=$URL"
+
       - name: Smoke test
         run: |
-          ENV_NAME=studentpilot-backend-env
-          CNAME=$(eb status "$ENV_NAME" | awk '/CNAME:/ {print $2}')
-          echo "CNAME=$CNAME"
-          curl -fsS http://$CNAME/health || (echo "Health failed" && exit 1)
-          curl -s -X POST http://$CNAME/api/search -H 'Content-Type: application/json' -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 300 || true
+          URL=${{ steps.eburl.outputs.url }}
+          echo "Testing $URL"
+          curl -fsS http://$URL/health || (echo "Health failed" && exit 1)
+          curl -s -X POST http://$URL/api/search -H 'Content-Type: application/json' -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 300 || true
 
-# This file is intentionally disabled to avoid duplicate deployments.
-# Canonical workflow: .github/workflows/deploy-backend.yml
-# Left in repo so former references don't cause confusion. Will never run.
-
-on:
-  push:
-    branches: [ __never_run__ ]
-  workflow_dispatch: {}
-
-jobs:
-  noop:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "This legacy workflow is disabled. Use deploy-backend.yml instead."
+      - name: Trigger Vercel deploy (Deploy Hook)
+        if: steps.eburl.outputs.url != '' && secrets.VERCEL_DEPLOY_HOOK != ''
+        run: |
+          echo "Triggering Vercel redeploy..."
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
