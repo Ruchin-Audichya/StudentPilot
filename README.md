@@ -78,6 +78,51 @@ We intentionally keep secrets out of the repo. Use your hosting provider’s das
 ## Deployment Snapshot
 Backend lives on AWS Elastic Beanstalk (Docker). Frontend is on Vercel and proxies API calls to the EB URL transparently via `/api/backend/*`. Health checks live at `/health`.
 
+### Backend Elastic Beanstalk (AL2023) Deployment
+Automated via GitHub Actions workflow: `.github/workflows/deploy-eb.yml` (runs on changes under `backend/` on `main`).
+
+Secrets required in GitHub repo settings:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_DEFAULT_REGION` (e.g. `ap-south-1`)
+- `VERCEL_DEPLOY_HOOK` (optional – triggers frontend redeploy after backend success)
+
+Environment variables set in EB (via console or future config):
+- `PORT=8000` (implicitly used by process config and Docker CMD)
+- `DISABLE_LINKEDIN=1` (optional to skip heavier scraper)
+- `FRONTEND_ORIGIN` (your Vercel URL, e.g. `https://your-app.vercel.app` for stricter CORS)
+- `OPENROUTER_API_KEY` (if AI/chat features enabled)
+
+Key files:
+- `backend/Dockerfile` – Builds FastAPI + Gunicorn image (binds to `${PORT}`)
+- `backend/.ebextensions/00-process.config` – AL2023 process definition (no legacy ContainerPort)
+- `backend/.ebignore` – Keeps bundle lean
+
+Manual trigger (no code change) if needed:
+```powershell
+git commit --allow-empty -m "ci: force eb deploy"
+git push
+```
+
+After deploy completes, find CNAME in EB console (e.g. `studentpilot-env.abc123.ap-south-1.elasticbeanstalk.com`) and verify:
+```
+curl https://<CNAME>/health
+```
+You should see JSON `{"status":"ok"}`.
+
+Frontend proxy test (once `BACKEND_ORIGIN`/`EB_BACKEND_ORIGIN` env set in Vercel if used):
+```
+curl https://<your-vercel-domain>/api/backend/health
+```
+Same expected JSON.
+
+If a deploy fails at the EB build phase, common causes:
+1. Incorrect Dockerfile COPY paths (fixed: we copy relative to `backend/` context now)
+2. Reintroduction of legacy `.ebextensions` with `aws:elasticbeanstalk:container:docker` (guard step will fail fast)
+3. Missing Python deps (ensure `requirements.txt` updated)
+
+Retry strategy: push a small commit; the workflow creates/updates the application version and performs a smoke test automatically.
+
 ## Roadmap
 - Add more sources (LinkedIn refined, AngelList, company pages)
 - Email / WhatsApp alerts for new high‑fit roles
