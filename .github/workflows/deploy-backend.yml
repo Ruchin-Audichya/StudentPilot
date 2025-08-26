@@ -1,0 +1,110 @@
+name: Deploy Backend (Elastic Beanstalk)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      AWS_DEFAULT_REGION: ap-south-1
+      APP_NAME: studentpilot-backend
+      ENV_NAME: wheresmystipend-env-1
+      PORT: 8000
+      WORKING_DIR: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install EB CLI
+        run: |
+          pip install --upgrade pip
+          pip install awsebcli
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Debug region/keys presence
+        run: |
+          echo "AWS_REGION=$AWS_REGION"
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
+          test -n "$AWS_ACCESS_KEY_ID" && echo "Access key present" || echo "Access key MISSING"
+          test -n "$AWS_SECRET_ACCESS_KEY" && echo "Secret key present" || echo "Secret key MISSING"
+
+      - name: Verify AWS identity
+        run: |
+          pip install awscli --quiet
+          aws sts get-caller-identity
+
+      - name: Ensure EB app/env
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          set -e
+          if [ ! -d .elasticbeanstalk ]; then
+            eb init $APP_NAME --region $AWS_REGION --platform Docker
+          fi
+          if ! eb list 2>/dev/null | grep -qw "$ENV_NAME"; then
+            eb create $ENV_NAME --single --timeout 20
+          fi
+          eb use $ENV_NAME
+
+      - name: Set env vars (backend)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          eb setenv PORT=8000 DISABLE_LINKEDIN=1 || true
+
+      - name: Deploy
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          eb deploy $ENV_NAME --staged --label Auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}
+
+      - name: Show status
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          eb status $ENV_NAME || true
+          eb health $ENV_NAME --refresh || true
+
+      - name: Output CNAME
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          eb status $ENV_NAME | grep CNAME || true
+
+      - name: Smoke test (health & sample search)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          set -e
+          CNAME=$(eb status $ENV_NAME | awk '/CNAME:/ {print $2}')
+          if [ -z "$CNAME" ]; then echo "Could not determine CNAME"; exit 1; fi
+          ORIGIN=https://$CNAME
+          echo "CNAME=$CNAME" | tee cname.txt
+          echo "Health:" && curl -fsS $ORIGIN/health || (echo "Health check failed" && exit 1)
+          echo "Sample search:" && curl -s -X POST "$ORIGIN/api/search" -H 'Content-Type: application/json' \
+            -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 400 || true
+          echo "Done." 
+
+      - name: Upload CNAME artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eb-cname
+          path: backend/cname.txt

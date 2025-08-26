@@ -1,52 +1,16 @@
-name: Deploy Backend to Elastic Beanstalk
+name: DISABLED legacy EB workflow (do not use)
+
+# This file is intentionally disabled to avoid duplicate deployments.
+# Canonical workflow: .github/workflows/deploy-backend.yml
+# Left in repo so former references don't cause confusion. Will never run.
 
 on:
   push:
-    branches: [ main ]
+    branches: [ __never_run__ ]
+  workflow_dispatch: {}
 
 jobs:
-  deploy:
+  noop:
     runs-on: ubuntu-latest
-    env:
-      APP_NAME: studentpilot-backend
-      ENV_NAME: studentpilot-backend-env
-      WORKING_DIR: backend
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install EB CLI
-        run: |
-          pip install --upgrade pip
-          pip install awsebcli
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
-
-      - name: Generate Dockerrun (single Docker container)
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          echo 'Using existing Dockerfile in backend/'
-
-      - name: EB Init (idempotent)
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          if [ ! -d .elasticbeanstalk ]; then
-            eb init $APP_NAME --platform Docker --region ${{ secrets.AWS_DEFAULT_REGION }}
-          fi
-          # Ensure environment exists; ignore error if it already does
-          eb use $ENV_NAME || true
-
-      - name: Deploy
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          eb deploy $ENV_NAME --staged
+      - run: echo "This legacy workflow is disabled. Use deploy-backend.yml instead."

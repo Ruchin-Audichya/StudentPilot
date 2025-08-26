@@ -21,7 +21,7 @@ export interface JobSearchParams {
   location?: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+import { API_BASE } from "../lib/apiBase";
 
 export async function searchInternships(params: JobSearchParams): Promise<JobResult[]> {
   const res = await fetch(`${API_BASE}/api/search`, {

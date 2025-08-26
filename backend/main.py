@@ -22,6 +22,16 @@ from datetime import datetime, timedelta
 from scrapers.internshala import fetch_internships
 from scrapers.linkedin import fetch_linkedin_internships
 
+# -----------------------------
+# AI / OpenRouter Configuration
+# -----------------------------
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_MODELS = [m.strip() for m in os.getenv("OPENROUTER_MODELS", "qwen/qwen3-coder:free").split(",") if m.strip()]
+OPENROUTER_BASE = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions").strip()
+OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://example.com").strip() or "https://example.com"
+OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", "Career Copilot").strip() or "Career Copilot"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()  # (Future fallback)
+
 # Allow disabling heavier LinkedIn Selenium scraper (e.g. on platforms without Chromium)
 DISABLE_LINKEDIN = os.getenv("DISABLE_LINKEDIN", "0") in {"1", "true", "yes", "on"}
 
@@ -29,19 +39,35 @@ DISABLE_LINKEDIN = os.getenv("DISABLE_LINKEDIN", "0") in {"1", "true", "yes", "o
 # App Setup
 # -----------------------------
 app = FastAPI()
+# Root welcome route so EB doesn't show default placeholder page
+@app.get("/")
+def root():
+    return {"app": "StudentPilot API", "health": "/health", "endpoints": ["/api/search", "/api/upload-resume", "/api/chat"], "status": "ok"}
 # Explicit CORS origins (override with CORS_ORIGINS env var comma separated)
 _default_origins = (
-    "http://localhost:5173,https://wms-virid-six.vercel.app,"  # existing
-    "http://localhost:8080,http://127.0.0.1:8080,http://127.0.0.1:5173"
+    "http://localhost:5173,https://wms-virid-six.vercel.app,"
+    "http://localhost:8080,http://127.0.0.1:8080,http://127.0.0.1:5173,"
+    "http://wheresmystipend-env-1.eba-bdf4swct.ap-south-1.elasticbeanstalk.com"
 )
-allowed_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=True,
-)
+_cors_env = os.getenv("CORS_ORIGINS", _default_origins).strip()
+if _cors_env == "*":
+    # Wildcard: allow all origins (cannot combine with allow_credentials)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
+else:
+    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
 
 # Simple logging middleware (enabled when DEBUG_LOG=1)
 if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
@@ -147,15 +173,37 @@ def _tag_new(posted: Optional[str]) -> bool:
     return False
 
 def _score_job(job: Dict, profile: Dict) -> float:
-    text = f"{job.get('title','')} {job.get('description','')}".lower()
-    score = 0
-    for skill in profile["skills"]:
-        if skill in text:
-            score += 1
-    for role in profile["roles"]:
-        if role in text:
-            score += 2
-    return min(100, score * 10)
+    """Heuristic scoring blending resume skill/role overlap and job text.
+
+    Components:
+    - Skill coverage ratio: overlap of resume skills with job text (title+desc)
+    - Term density: distinct resume terms appearing
+    - Role match: direct role keyword present
+    - Location alignment: location keyword match
+    - Paid signal: stipend present
+    """
+    job_text = f"{job.get('title','')} {job.get('description','')}".lower()
+    resume_skills = list(profile.get("skills", []))[:25]
+    resume_roles = list(profile.get("roles", []))[:8]
+    loc = (profile.get("location") or "").lower()
+
+    # Overlap
+    skill_hits = [s for s in resume_skills if s and s in job_text]
+    distinct_hits = set(skill_hits)
+    coverage = (len(distinct_hits) / max(1, len(resume_skills))) if resume_skills else 0
+
+    role_hit = any(r for r in resume_roles if r and r in job_text)
+
+    base = 40.0
+    base += min(25.0, coverage * 25.0)            # up to +25
+    base += min(20.0, len(distinct_hits) * 3.0)    # distinct term richness
+    if role_hit:
+        base += 10
+    if loc and loc in (job.get("location", "").lower()):
+        base += 5
+    if job.get("stipend"):
+        base += 3
+    return max(5.0, min(100.0, base))
 
 def _dedupe(jobs: List[Dict]) -> List[Dict]:
     seen = set()
@@ -167,6 +215,54 @@ def _dedupe(jobs: List[Dict]) -> List[Dict]:
         seen.add(key)
         out.append(job)
     return out
+
+# -----------------------------
+# AI Helper (OpenRouter)
+# -----------------------------
+import json, requests as _requests
+def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) -> str:
+    if not OPENROUTER_KEY or not user_message.strip():
+        return ""
+    model = OPENROUTER_MODELS[0] if OPENROUTER_MODELS else "qwen/qwen3-coder:free"
+    system_prompt = (
+        "You are a concise career assistant. Use bullet points. If giving advice, be specific and actionable. "
+        "You are augmenting a heuristic response; avoid repeating obvious info."
+    )
+    profile_snippet = {
+        "skills": sorted(list(profile.get("skills", [])))[:25],
+        "roles": sorted(list(profile.get("roles", [])))[:10],
+        "location": profile.get("location"),
+    }
+    resume_excerpt = (resume_text or "")[:4000]
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"User message: {user_message}\nProfile: {json.dumps(profile_snippet)}\nResume excerpt: {resume_excerpt}"},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 500,
+    }
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": OPENROUTER_SITE_URL,
+        "X-Title": OPENROUTER_SITE_NAME,
+    }
+    try:
+        resp = _requests.post(OPENROUTER_BASE, json=payload, headers=headers, timeout=25)
+        resp.raise_for_status()
+        data = resp.json()
+        # Try OpenAI-compatible structure
+        choices = data.get("choices") or []
+        if choices:
+            content = choices[0].get("message", {}).get("content")
+            if content:
+                return content.strip()
+        # Fallback raw
+        return json.dumps(data)[:800]
+    except Exception:
+        return ""
 
 # -----------------------------
 # Models
@@ -192,6 +288,16 @@ class Internship(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+
+# Simple status endpoint for frontend to detect resume/session profile
+@app.get("/api/resume-status")
+def resume_status():
+    return {
+        "has_resume": bool(resume_text),
+        "skills": sorted(list(resume_profile.get("skills", [])))[:12],
+        "roles": sorted(list(resume_profile.get("roles", [])))[:6],
+        "location": resume_profile.get("location"),
+    }
 
 # -----------------------------
 # Search Endpoint
@@ -365,6 +471,26 @@ def chat_with_ai(req: ChatRequest):
             *[f"  - {s}" for s in next_steps],
         ]
         return {"response": "\n".join(out)}
+        improvements = [
+            "Use action verbs (Built, Led, Achieved) + metrics (↑%, ↓ms).",
+            "Add 2–3 impact bullets per experience; keep to one page if early career.",
+            "Mirror 6–8 keywords from the target JD.",
+        ]
+        next_steps = [
+            "Pick 3 target roles and tailor bullets for each.",
+            "Add a ‘PROJECTS’ section with GitHub links.",
+            "Place email/phone and a short headline at the top.",
+        ]
+        out = [
+            f"- SUMMARY: Score: {score10}/10 — solid base with room to polish.",
+            "- STRENGTHS:",
+            *[f"  - {s}" for s in strengths],
+            "- IMPROVEMENTS:",
+            *[f"  - {s}" for s in improvements],
+            "- NEXT STEPS:",
+            *[f"  - {s}" for s in next_steps],
+        ]
+        return {"response": "\n".join(out)}
 
     # Skill gap analysis
     if has("skill gap", "gap analysis", "missing skills"):
@@ -412,16 +538,26 @@ def chat_with_ai(req: ChatRequest):
         ]
         return {"response": "\n".join(out)}
 
-    tips = [
-        "Upload your resume for tailored advice.",
+    has_resume = bool(resume_text)
+    tips = []
+    if not has_resume:
+        tips.append("Upload your resume for tailored advice.")
+    tips += [
         "Ask ‘Skill gap for backend’ or ‘Rate my resume’.",
-        "Try a fun prompt like ‘Give me a 3-step plan for a paid internship this month’.",
+        "Ask ‘Who am I’ to see what I've extracted.",
+        "Try: ‘3-step plan for paid internship this month’.",
     ]
+    summary = "I’m your internship co‑pilot—fast, friendly, and " + ("resume‑aware" if has_resume else "waiting for your resume") + "."
     out = [
-        "- SUMMARY: I’m your internship co-pilot—fast, friendly, and resume-aware.",
+        f"- SUMMARY: {summary}",
         "- TRY:",
         *[f"  - {t}" for t in tips],
     ]
+    # If OpenRouter key available, send the user message + resume context to model
+    if OPENROUTER_KEY:
+        ai_extra = _ai_enhanced_response(msg, resume_text, resume_profile)
+        if ai_extra:
+            out.append("- AI SUGGESTION:\n" + ai_extra)
     return {"response": "\n".join(out)}
 
 # -----------------------------

@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { FIREBASE_READY, uploadToStorage } from "@/lib/firebase";
+import { API_BASE } from "@/lib/apiBase";
 
 type Props = {
   onUploaded: (result: { status?: string; chars?: number; preview?: string; url?: string }) => void;
@@ -24,7 +25,7 @@ export default function ResumeUploader({ onUploaded }: Props) {
 
     const form = new FormData();
     form.append("file", file);
-  const res = await fetch((import.meta.env.VITE_API_BASE || "http://127.0.0.1:8011") + "/api/upload-resume", {
+  const res = await fetch(API_BASE + "/api/upload-resume", {
       method: "POST",
       body: form,
     });

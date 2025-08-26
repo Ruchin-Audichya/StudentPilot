@@ -1,0 +1,25 @@
+name: Smoke Test Backend
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_ORIGIN: ${{ secrets.BACKEND_ORIGIN }}
+    steps:
+      - name: Check origin env
+        run: |
+          if [ -z "$BACKEND_ORIGIN" ]; then echo "Set BACKEND_ORIGIN secret (e.g., https://wheresmystipend-env-1.xxxxx.ap-south-1.elasticbeanstalk.com)"; exit 1; fi
+          echo "Testing $BACKEND_ORIGIN";
+      - name: Health
+        run: |
+          curl -i -sS $BACKEND_ORIGIN/health || exit 1
+      - name: Sample search
+        run: |
+          curl -s -X POST $BACKEND_ORIGIN/api/search -H 'Content-Type: application/json' \
+            -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 600 || true

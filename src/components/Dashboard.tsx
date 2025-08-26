@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { API_BASE } from "@/lib/apiBase";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
@@ -31,8 +32,14 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/health`).then(r => { if(!cancelled) setBackendOk(r.ok); }).catch(() => { if(!cancelled) setBackendOk(false); });
+    return () => { cancelled = true; };
+  }, []);
+
 
   // Chatbot states
   const [chatInput, setChatInput] = useState("");
@@ -140,6 +147,7 @@ export default function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="min-h-screen p-6 md:p-8">
+      <div className="text-xs mb-2">Backend: {backendOk === null ? 'checking…' : backendOk ? 'online ✅' : 'offline ❌'}</div>
       {/* Top bar */}
       <header className="mb-8 flex items-center justify-between">
         <div>
