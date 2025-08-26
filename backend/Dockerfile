@@ -55,4 +55,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 CMD curl 
 EXPOSE 8000
 
 # Gunicorn start (workers & timeout tunable via env)
-CMD ["sh", "-c", "gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000} --workers ${WORKERS:-2} --timeout ${TIMEOUT:-120} --log-level ${LOG_LEVEL:-info}"]
+CMD ["gunicorn","-k","uvicorn.workers.UvicornWorker","main:app","--bind","0.0.0.0:${PORT}","--workers","${WORKERS:-2}","--timeout","${TIMEOUT:-120}"]

@@ -1,4 +1,70 @@
-name: DISABLED legacy EB workflow (do not use)
+name: Deploy Backend to Elastic Beanstalk
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-eb.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Install EB CLI
+        run: pip install --upgrade awsebcli
+
+      - name: EB init (non-interactive, Docker AL2023)
+        run: |
+          APP_NAME=studentpilot-backend
+          eb init "$APP_NAME" -p "Docker" --region "${{ secrets.AWS_DEFAULT_REGION }}" || true
+
+      - name: Create environment if missing
+        run: |
+          ENV_NAME=studentpilot-backend-env
+          if ! eb status "$ENV_NAME" >/dev/null 2>&1; then
+            eb create "$ENV_NAME" --single --platform "Docker" --cname "$ENV_NAME"
+          fi
+
+      - name: Set/refresh env vars
+        run: |
+          eb use studentpilot-backend-env
+          eb setenv PORT=8000 WORKERS=2 TIMEOUT=120
+
+      - name: Deploy
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          LABEL="build-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+          echo "LABEL=$LABEL"
+          eb deploy --label "$LABEL" --staged
+
+      - name: Smoke test
+        run: |
+          ENV_NAME=studentpilot-backend-env
+          CNAME=$(eb status "$ENV_NAME" | awk '/CNAME:/ {print $2}')
+          echo "CNAME=$CNAME"
+          curl -fsS http://$CNAME/health || (echo "Health failed" && exit 1)
+          curl -s -X POST http://$CNAME/api/search -H 'Content-Type: application/json' -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 300 || truename: DISABLED legacy EB workflow (do not use)
 
 # This file is intentionally disabled to avoid duplicate deployments.
 # Canonical workflow: .github/workflows/deploy-backend.yml
