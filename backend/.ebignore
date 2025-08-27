@@ -1,6 +1,78 @@
-.venv
+# Bytecode / caches
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environments & dependencies not needed on EB upload
+.venv/
+env/
+venv/
+node_modules/
+
+# Version control & metadata
+.git/
+.gitignore
+.gitattributes
+
+# Local & editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.orig
+*.bak
+*.tmp
+*.local
+
+# Logs & profiling
+*.log
+logs/
+profile.data
+
+# Tests (not required for runtime)
+tests/
+test*/
+**/smoke_test.py
+
+# Docs & markdown (optional to exclude to shrink bundle)
+README.md
+LICENSE
+*.md
+
+# Build and tooling artifacts
+Dockerfile.minimal
+docker-compose.yml
+scripts/*.sh
+scripts/*.ps1
+*.coverage
+coverage.xml
+htmlcov/
+
+# Python packaging (not used here)
+dist/
+build/
+*.egg-info/
+
+# Ignore old/unused entrypoints
+simple_main.py
+main_simple.py
+
+# Secrets / env files
 .env
 .env.*
-*.log
+*.pem
+*.key
+*.crt
+
+# Selenium / driver caches (if any)
+*.log.*
+
+# Cache dirs from tools
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Scraper pycache subdirs
+scrapers/__pycache__/
