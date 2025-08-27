@@ -51,6 +51,62 @@ jobs:
         run: |
           eb use WheresMyStipend-env-2 || true
 
-      - name: Deploy to Elastic Beanstalk
+      - name: Wait for Elastic Beanstalk environment Ready
         run: |
-          eb deploy
+          set -euo pipefail
+          APP_NAME="WheresMyStipend"
+            ENV_NAME="WheresMyStipend-env-2"
+          REGION="ap-south-1"
+          INTERVAL=20
+          TIMEOUT=900  # 15 minutes
+          echo "Waiting for environment $ENV_NAME in app $APP_NAME to become Ready (timeout ${TIMEOUT}s, interval ${INTERVAL}s)..."
+          start=$(date +%s)
+          while true; do
+            now=$(date +%s)
+            elapsed=$(( now - start ))
+            status=$(aws elasticbeanstalk describe-environments \
+              --application-name "$APP_NAME" \
+              --environment-names "$ENV_NAME" \
+              --region "$REGION" \
+              --query 'Environments[0].Status' \
+              --output text 2>/dev/null || echo "Unknown")
+            health=$(aws elasticbeanstalk describe-environments \
+              --application-name "$APP_NAME" \
+              --environment-names "$ENV_NAME" \
+              --region "$REGION" \
+              --query 'Environments[0].Health' \
+              --output text 2>/dev/null || echo "Unknown")
+            echo "Status: $status | Health: $health | Elapsed: ${elapsed}s"
+            if [ "$status" = "Ready" ]; then
+              echo "Environment is Ready. Proceeding to deploy."
+              break
+            fi
+            if [ $elapsed -ge $TIMEOUT ]; then
+              echo "ERROR: Environment not Ready after ${elapsed}s (last status: $status)." >&2
+              exit 1
+            fi
+            sleep $INTERVAL
+          done
+
+      - name: Deploy with retries
+        run: |
+          set -euo pipefail
+          MAX_ATTEMPTS=3
+          SLEEP_BETWEEN=30
+          attempt=1
+          while [ $attempt -le $MAX_ATTEMPTS ]; do
+            echo "Deploy attempt $attempt of $MAX_ATTEMPTS..."
+            if eb deploy; then
+              echo "Deploy succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "Deploy failed on attempt $attempt"
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "Waiting ${SLEEP_BETWEEN}s before retry..."
+              sleep $SLEEP_BETWEEN
+            else
+              echo "ERROR: All $MAX_ATTEMPTS deploy attempts failed." >&2
+              exit 1
+            fi
+            attempt=$(( attempt + 1 ))
+          done
