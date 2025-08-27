@@ -3,33 +3,35 @@ name: Deploy FastAPI to Elastic Beanstalk (env-2)
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy.yml'
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-    name: Deploy Backend
+    name: Deploy Backend to EB env-2
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-            python-version: '3.13'
-            cache: 'pip'
-            cache-dependency-path: backend/requirements.txt
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          # Install backend-specific dependencies if they are maintained separately
+          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+
+      - name: Ensure Procfile exists (root)
+        run: |
+          echo "Current Procfile:" && cat Procfile
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,10 +43,14 @@ jobs:
       - name: Install EB CLI
         run: pip install awsebcli
 
-      - name: Initialize & Deploy
-        env:
-          AWS_REGION: ap-south-1
+      - name: Initialize EB (idempotent)
         run: |
           eb init WheresMyStipend --platform python-3.13 --region ap-south-1 || true
+
+      - name: Select environment
+        run: |
           eb use WheresMyStipend-env-2 || true
+
+      - name: Deploy to Elastic Beanstalk
+        run: |
           eb deploy
