@@ -92,15 +92,16 @@ Frontend (Vercel env):
 4. Health check path: `/health`.
 5. (Optional) Turn on enhanced health for faster fail detection.
 
-### Render (Free Tier) – Simpler
-1. New Web Service → Connect GitHub repo → Root Directory: `backend`.
-2. Runtime: Python 3.11.
-3. Build Command:
-	`pip install -r requirements.txt`
-4. Start Command:
-	`uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Add env vars (same as EB). Keep `DISABLE_LINKEDIN=1` to avoid Selenium.
-6. After deploy, verify `https://<service>.onrender.com/health` returns `{ "status": "ok" }`.
+### Render (Free Tier) – Simplest Backend Deploy
+Render reads `render.yaml` (already in repo) so you can accept most defaults:
+1. New Web Service → Connect GitHub repo.
+2. Select Root Directory: `backend` (or leave auto if detected by render.yaml).
+3. Runtime: Python 3.x (latest).
+4. Build Command: `pip install -r requirements.txt`
+5. Start Command (if not auto-filled):
+	`gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --workers 3 --timeout 120`
+6. Env Vars (add now): `OPENROUTER_API_KEY` (secret), `CORS_ORIGINS`, `FRONTEND_ORIGIN`, `DISABLE_LINKEDIN=1`.
+7. Deploy → confirm health: visit `https://<service>.onrender.com/health` expecting `{"status": "ok"}`.
 
 Frontend (Vercel):
 1. Set (optionally) `VITE_API_BASE` to your backend origin or leave blank to use development defaults.
