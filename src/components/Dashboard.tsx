@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
 import JobCard from "@/components/JobCard";
+import BackendDebug from "@/components/BackendDebug";
 
 interface StudentProfile {
   name: string;
@@ -204,6 +205,7 @@ export default function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="min-h-screen p-6 md:p-8">
+  <div className="mb-4"><BackendDebug /></div>
       <div className="text-xs mb-2">
         Backend: {backendOk === null ? 'checking…' : backendOk ? 'online ✅' : (
           <span className="cursor-pointer underline decoration-dotted" title="Click to retry" onClick={manualRetryBackend}>offline ❌ (retry)</span>

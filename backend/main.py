@@ -116,6 +116,17 @@ def health_check():
     """Fast health endpoint (no scraping, disk, or network) for EB / load balancers."""
     return {"status": "ok"}
 
+@app.get("/version")
+def version_info():
+    """Lightweight version & config surface for frontend debugging (no secrets)."""
+    return {
+        "status": "ok",
+        "version": os.getenv("RELEASE", "dev"),
+        "commit": os.getenv("GIT_SHA", "unknown"),
+        "backend": "studentpilot",
+        "openrouter": bool(os.getenv("OPENROUTER_API_KEY", "").strip()),
+    }
+
 resume_text = ""
 resume_profile = {"skills": set(), "roles": set(), "location": None}
 buzzword_skills = set()
