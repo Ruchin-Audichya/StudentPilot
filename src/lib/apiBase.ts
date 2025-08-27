@@ -9,6 +9,15 @@ function computeApiBase(): string {
   const raw: string | undefined = (import.meta as any)?.env?.VITE_API_BASE;
   const cleaned = raw?.trim();
   const isVercel = isBrowser && window.location.hostname.endsWith('vercel.app');
+  // Allow runtime override for debugging without rebuild
+  try {
+    if (isBrowser) {
+      const ov = localStorage.getItem('API_BASE_OVERRIDE');
+      if (ov && /^https?:\/\/\w+/i.test(ov)) {
+        return ov.replace(/\/$/, '');
+      }
+    }
+  } catch {/* ignore */}
   if (isVercel) {
     // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
     if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
