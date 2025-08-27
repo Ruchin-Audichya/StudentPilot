@@ -6,7 +6,8 @@ services:
     region: oregon
     rootDir: backend
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --workers 3 --timeout 120
+  # Explicit module path (defensive if working dir differs)
+  startCommand: gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     autoDeploy: true
     healthCheckPath: /health
     envVars:
@@ -18,3 +19,5 @@ services:
         value: https://wms-virid-six.vercel.app
       - key: OPENROUTER_API_KEY
         sync: false   # set in dashboard/infra
+      - key: OPENROUTER_MODELS
+        value: qwen/qwen3-coder:free
