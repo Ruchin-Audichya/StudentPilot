@@ -8,6 +8,9 @@ from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 
 def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', limit: int = 12) -> List[Dict]:
+    if os.getenv("DISABLE_LINKEDIN", "0") in {"1","true","yes","on"}:
+        # Feature-flagged off in production to avoid Selenium / Chromium cost.
+        return []
     """
     Scrape LinkedIn for internships using Selenium.
     Returns a list of dictionaries with internship details.

@@ -1,155 +1,148 @@
 <div align="center">
 
-# Where’s My Stipend 💸
+# StudentPilot (Where’s My Stipend) 💸
 
-Your smart internship matcher: upload your resume, set what you care about, and instantly see paid internships ranked by real skill fit – not buzzwords.
+Career + internship copilot: upload a resume, instantly extract skills & roles, fetch fresh internships, and chat with an AI tuned for concise, actionable career advice.
 
 ![Hero](./src/assets/hero-nexus.jpg)
 
 </div>
 
-## Why We Built It
-Hunting for a good internship is noisy, biased toward unpaid roles, and wastes time. Students scroll; opportunities slip away. We flip the model: you give us your profile and goals – we surface what actually fits and highlight why.
+## Highlights
+| Area | What You Get |
+|------|--------------|
+| Resume Intelligence | PDF / DOCX / TXT parsing, skill + role auto‑extraction |
+| Multi‑Source Feed | Internshala scraper (extensible), de‑duplication, scoring |
+| Scoring Heuristics | Skill coverage, distinct term density, role & stipend boosts |
+| UX Signals | Hot (>=85 pre‑normalized), New (recent posting cues) |
+| AI Assistant | Resume‑aware (if uploaded) OpenRouter chat, fallback graceful |
+| Skill Gap | Target track detection and gap plan (frontend/back/data/etc) |
+| Firebase (Optional) | Anonymous auth + Firestore profile + backend user log ping |
 
-## What You Can Do (In Plain English)
-1. Upload your resume – we extract your skills & roles automatically.
-2. Tell us your preferences (domains, stipend expectations, location, mode).
-3. Get a live feed of fresh internships (Internshala + more sources expanding).
-4. See clear match scores with Hot / New tags so you act fast.
-5. Ask the built‑in career bot for quick improvement tips and profile gaps.
+## Updated Stack
+Frontend: React + Vite + TypeScript + Tailwind + shadcn/ui + React Query  
+Backend: FastAPI, Requests, BeautifulSoup, optional Selenium (feature‑flag)  
+Parsing: python-docx, PyMuPDF (optional)  
+AI: OpenRouter (model list via `OPENROUTER_MODELS`)  
+Deployment: Vercel (frontend) + AWS Elastic Beanstalk or Render (backend)  
+Auth/Data: Firebase (anonymous) – optional; app still works without it.
 
-## Core Features
-✅ Resume parsing (PDF / DOCX / TXT) → auto skill & role detection
-✅ Multi‑source scraping (Internshala today; more coming) with de‑duplication
-✅ Smart match score (skill coverage, title similarity, stipend, recency)
-✅ Hot / New tagging & relevance ordering
-✅ Resume‑aware chat assistant (optional AI) for feedback & suggestions
-✅ Skill gap hints so you know what to learn next
-✅ Simple, responsive dashboard built for speed
-
-## Tech Stack (Lean Overview)
-Frontend: React + Vite + TypeScript + Tailwind + shadcn/ui
-Backend: FastAPI (Python) + Requests + BeautifulSoup + optional Selenium
-Matching & Parsing: PyMuPDF, python-docx, rapidfuzz heuristics
-AI (optional): OpenRouter (multi‑model) / Gemini fallback
-Infra & Delivery: Docker, AWS Elastic Beanstalk (API), Vercel (frontend proxy)
-Auth / Data (optional mode): Firebase
-
-## Quick Start
-Clone & install:
+## Quick Start (Local)
+Backend:
 ```powershell
-git clone https://github.com/Ruchin-Audichya/StudentPilot.git
-cd StudentPilot
-npm install
 cd backend
-python -m venv .venv; . .venv\Scripts\Activate.ps1
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+$env:DISABLE_LINKEDIN='1'   # keep Selenium off locally
+# (optional) $env:OPENROUTER_API_KEY='sk-or-...'
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
-
-Run backend:
+Frontend (new terminal):
 ```powershell
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-Run frontend (new terminal at project root):
-```powershell
+npm install
+$env:VITE_API_BASE='http://127.0.0.1:8000'
 npm run dev
 ```
+Visit: http://localhost:5173
 
-Open: http://localhost:5173
+Upload a resume → see extracted skills (hit `/api/resume-status`) → search internships → chat.
 
-Upload a resume (dummy PDF works) → watch skills populate → search internships.
+## Environment Variables
+Backend (set in EB / Render dashboard):
+| Name | Purpose | Example |
+|------|---------|---------|
+| OPENROUTER_API_KEY | Enables AI chat augmentation | sk-or-... |
+| OPENROUTER_MODELS | Comma list of model IDs | qwen/qwen3-coder:free |
+| FRONTEND_ORIGIN | Strict CORS allowlist | https://yourapp.vercel.app |
+| DISABLE_LINKEDIN | Skip Selenium scraping | 1 |
+| CORS_ORIGINS | Extra allowed origins | https://foo.app,https://bar.dev |
 
-### One-Click Deploy Trigger (CI)
-Run the PowerShell helper to force a backend deploy via GitHub Actions:
-`pwsh scripts/trigger-deploy.ps1 -Message "ci: redeploy"`
+Frontend (Vercel env):
+| Name | Purpose |
+|------|---------|
+| VITE_API_BASE | Override API base (optional) |
+| VITE_FIREBASE_* | Firebase config keys (optional) |
 
-### Manual Smoke Test (direct EB origin)
-After a deploy, run (Linux/macOS WSL):
-`bash backend/scripts/smoke.sh https://<your-eb-cname>`
-Outputs health JSON & a truncated search response.
+## Deployment (Backend)
+### AWS Elastic Beanstalk (Docker)
+1. Ensure `backend/Dockerfile` (already present) builds locally: `docker build -t studentpilot-backend .` from repo root.
+2. Create EB Python/Docker env → upload container app (or use EB CLI with Dockerrun from root).
+3. Set env vars: `OPENROUTER_API_KEY`, `DISABLE_LINKEDIN=1`, `FRONTEND_ORIGIN=https://<vercel-domain>`.
+4. Health check path: `/health`.
+5. (Optional) Turn on enhanced health for faster fail detection.
 
-## Environment (Minimal Essentials)
-Frontend: `VITE_API_BASE` (leave blank in prod – it auto uses the proxy)
-Backend (optional): `OPENROUTER_API_KEY`, `DISABLE_LINKEDIN=1` (to skip heavy scraping)
+### Render (Free Tier) – Simpler
+1. New Web Service → Connect GitHub repo → Root Directory: `backend`.
+2. Runtime: Python 3.11.
+3. Build Command:
+	`pip install -r requirements.txt`
+4. Start Command:
+	`uvicorn main:app --host 0.0.0.0 --port $PORT`
+5. Add env vars (same as EB). Keep `DISABLE_LINKEDIN=1` to avoid Selenium.
+6. After deploy, verify `https://<service>.onrender.com/health` returns `{ "status": "ok" }`.
 
-We intentionally keep secrets out of the repo. Use your hosting provider’s dashboard to add them.
+Frontend (Vercel):
+1. Set (optionally) `VITE_API_BASE` to your backend origin or leave blank to use development defaults.
+2. If using a proxy route, adjust rewrites in `vercel.json` accordingly.
 
-## Deployment Snapshot
-Backend lives on AWS Elastic Beanstalk (Docker). Frontend is on Vercel and proxies API calls to the EB URL transparently via `/api/backend/*`. Health checks live at `/health`.
+## Firebase Integration
+- Anonymous user ensured on onboarding.
+- After onboarding save, frontend posts `/api/log-user` with uid + anonymous flag → simple in‑memory rolling log (no PII persisted server‑side).
+- If Firebase envs missing, app still runs (logging simply no‑ops).
 
-### Backend Elastic Beanstalk (AL2023) Deployment
-Automated via GitHub Actions workflow: `.github/workflows/deploy-eb.yml` (runs on changes under `backend/` on `main`).
+## AI Chat
+1. Provide `OPENROUTER_API_KEY`.
+2. Optional: customize `OPENROUTER_MODELS` (first entry used).
+3. Chat endpoint blends heuristic guidance + model output; if AI call fails you see an `AI NOTE` line.
 
-Secrets required in GitHub repo settings:
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION` (e.g. `ap-south-1`)
-- `VERCEL_DEPLOY_HOOK` (optional – triggers frontend redeploy after backend success)
+## Fallback / Offline Behavior
+- If scraping yields zero jobs (blocked / network issue) backend now emits clear SAMPLE listings (source=`sample`) so UI remains functional.
+- Disable by removing the fallback block in `main.py` if undesired.
 
-Environment variables set in EB (via console or future config):
-- `PORT=8000` (implicitly used by process config and Docker CMD)
-- `DISABLE_LINKEDIN=1` (optional to skip heavier scraper)
-- `FRONTEND_ORIGIN` (your Vercel URL, e.g. `https://your-app.vercel.app` for stricter CORS)
-- `OPENROUTER_API_KEY` (if AI/chat features enabled)
+## Cleaning & Slimming (Done)
+- Removed unused dependency `rapidfuzz`.
+- PowerShell dev helper scripts removed on request.
+- Added `/api/log-user` endpoint & frontend hook.
+- Requirements file grouped & commented.
 
-Key files:
-- `backend/Dockerfile` – Builds FastAPI + Gunicorn image (binds to `${PORT}`)
-- `backend/.ebextensions/00-process.config` – AL2023 process definition (no legacy ContainerPort)
-- `backend/.ebignore` – Keeps bundle lean
-
-Manual trigger (no code change) if needed:
+## Testing (Manual Smoke)
 ```powershell
-git commit --allow-empty -m "ci: force eb deploy"
-git push
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8000/api/search -Body (@{query='python'; filters=@{location='India'}} | ConvertTo-Json) -ContentType 'application/json'
+Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8000/api/chat -Body (@{message='Rate my resume'} | ConvertTo-Json) -ContentType 'application/json'
 ```
 
-After deploy completes, find CNAME in EB console (e.g. `studentpilot-env.abc123.ap-south-1.elasticbeanstalk.com`) and verify:
+## Roadmap (Next Polishing Steps)
+- Persist user resume/profile per UID (currently global in‑memory)  
+- Pagination & caching layer for search results  
+- Basic pytest suite + GitHub CI  
+- Add additional sources (LinkedIn refined, AngelList)  
+- Replace heuristic scoring with embedding similarity  
+
+## Demo Flow (For Judges)
+1. Open the hosted frontend (Vercel) – point out Backend status indicator.
+2. Upload `backend/test_resume.txt` (works even as .txt) – watch extracted skills appear.
+3. Run a search (e.g. "python" / keep location India) – highlight scoring & tags.
+4. Ask Chat: "Skill gap for backend" then "Rate my resume" – show AI augmentation.
+5. (Optional) Toggle network throttling / show fallback SAMPLE listings resilience.
+6. Mention extensibility: new scrapers just need to return a list of job dicts.
+
+## Architecture Snapshot
 ```
-curl https://<CNAME>/health
+frontend (Vercel) --> /api/backend/* rewrite --> backend (FastAPI on EB/Render)
+										 |--> /health
+										 |--> /api/search (scrapers + scoring)
+										 |--> /api/upload-resume (parse + profile)
+										 |--> /api/chat (heuristics + OpenRouter)
+										 |--> /api/log-user (anon usage ping)
 ```
-You should see JSON `{"status":"ok"}`.
-
-Frontend proxy test (once `BACKEND_ORIGIN`/`EB_BACKEND_ORIGIN` env set in Vercel if used):
-```
-curl https://<your-vercel-domain>/api/backend/health
-```
-Same expected JSON.
-
-If a deploy fails at the EB build phase, common causes:
-1. Incorrect Dockerfile COPY paths (fixed: we copy relative to `backend/` context now)
-2. Reintroduction of legacy `.ebextensions` with `aws:elasticbeanstalk:container:docker` (guard step will fail fast)
-3. Missing Python deps (ensure `requirements.txt` updated)
-
-Retry strategy: push a small commit; the workflow creates/updates the application version and performs a smoke test automatically.
-
-## Roadmap
-- Add more sources (LinkedIn refined, AngelList, company pages)
-- Email / WhatsApp alerts for new high‑fit roles
-- Deeper semantic matching (embeddings)
-- Career trajectory suggestions & learning pathways
-- Application tracking & success analytics
-- Gamified streaks + profile strength score
-
-## Screens (Preview)
-Landing • Dashboard • Onboarding • Match Scores (Add your own screenshots under `docs/screenshots/` to display here.)
-
-## Contributing
-Have an idea or want to plug in a new source? PRs welcome.
-1. Fork + branch
-2. Keep changes focused
-3. Add a short description / screenshot
-4. Open PR – we review fast
-
-## Credits
-Built with care by:
-Ruchin Audichya – Engineering & UX
-Shriya Gakkhar – Product, UX & QA
-
-If this helps you land something great, drop a star ⭐ and share it with friends.
 
 ## License
-Open for learning & experimentation. Feel free to adapt – add a formal license file (MIT recommended) if you fork for production.
+MIT (see LICENSE)
+
+## Credits
+Built by Ruchin Audichya & Shriya Gakkhar. If this helps you, star ⭐ the repo.
 
 ---
-Internship search should feel empowering, not exhausting. This is our small step toward that future.
+Internship search should feel empowering—this project is our step toward that.

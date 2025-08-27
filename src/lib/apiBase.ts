@@ -20,3 +20,19 @@ function computeApiBase(): string {
 }
 
 export const API_BASE = computeApiBase();
+
+// Lightweight user log (fire and forget). Import where auth user becomes available.
+export async function logUserEvent(user: { uid: string; isAnonymous?: boolean; email?: string | null }) {
+  try {
+    await fetch(`${API_BASE}/api/log-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid: user.uid,
+        is_anonymous: user.isAnonymous ?? true,
+        email: user.email || undefined,
+        platform: navigator?.userAgent?.slice(0,120) || undefined,
+      }),
+    });
+  } catch {/* ignore */}
+}

@@ -4,6 +4,8 @@ import time
 import re
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE_URL = "https://internshala.com"
 
@@ -12,8 +14,15 @@ HEADERS = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/123.0 Safari/537.36"
-    )
+    ),
+    "Accept-Language": "en-US,en;q=0.9"
 }
+
+# Shared session with simple retries (network resilience) and polite timeouts.
+_session = requests.Session()
+_retries = Retry(total=2, backoff_factor=0.6, status_forcelist=[429,500,502,503,504], allowed_methods=["GET"])  # type: ignore
+_session.mount("https://", HTTPAdapter(max_retries=_retries))
+_session.headers.update(HEADERS)
 
 TAG_PATTERNS = {
     "remote": ["remote", "work from home", "wfh"],
@@ -43,7 +52,7 @@ def _fetch_detail_page(url: str) -> Dict[str, str]:
     """
     out = {}
     try:
-        r = requests.get(url, headers=HEADERS, timeout=15)
+        r = _session.get(url, timeout=20)
         r.raise_for_status()
         soup = BeautifulSoup(r.content, "html.parser")
 
@@ -85,7 +94,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         url += f"/in-{loc}"
 
     try:
-        resp = requests.get(url, timeout=15, headers=HEADERS)
+        resp = _session.get(url, timeout=20)
         resp.raise_for_status()
     except Exception:
         return []
@@ -124,7 +133,8 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         extra = {}
         if link:
             extra = _fetch_detail_page(link)
-            time.sleep(0.6)  # be polite to Internshala
+            # polite jitter (short) to avoid hammering while still being fast
+            time.sleep(0.35 + 0.25 * (hash(link) % 100) / 100.0)
 
         # Merge tags with auto-detected ones
         combined_tags = list(set(tags + _auto_tags(desc_text + " " + extra.get("description_full", ""))))

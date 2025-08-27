@@ -1,4 +1,5 @@
 import { auth, db, ensureAnonymousUser, FIREBASE_READY } from "@/lib/firebase";
+import { logUserEvent } from "@/lib/apiBase";
 import {
   doc,
   setDoc,
@@ -50,6 +51,9 @@ export async function saveOnboardingData(data: OnboardingPayload): Promise<{ uid
       savedAt: serverTimestamp(),
     }, { merge: true }),
   ]);
+
+  // Fire and forget user log
+  logUserEvent({ uid, isAnonymous: user.isAnonymous, email: user.email });
 
   return { uid };
 }

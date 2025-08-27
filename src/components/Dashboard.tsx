@@ -34,11 +34,38 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [uploaded, setUploaded] = useState(false);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
+  // Backend health polling: initial + retries (handles case where frontend starts before backend)
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/health`).then(r => { if(!cancelled) setBackendOk(r.ok); }).catch(() => { if(!cancelled) setBackendOk(false); });
+    let attempts = 0;
+    const maxAttempts = 25; // ~50s with 2s interval
+    async function check() {
+      if (cancelled) return;
+      attempts++;
+      try {
+        const r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+        if (!cancelled) {
+          setBackendOk(r.ok);
+          if (!r.ok && attempts < maxAttempts) setTimeout(check, 2000);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setBackendOk(false);
+          if (attempts < maxAttempts) setTimeout(check, 2000);
+        }
+      }
+    }
+    check();
     return () => { cancelled = true; };
   }, []);
+
+  function manualRetryBackend() {
+    setBackendOk(null);
+    // Trigger a one-off recheck
+    fetch(`${API_BASE}/health`, { cache: 'no-store' })
+      .then(r => setBackendOk(r.ok))
+      .catch(() => setBackendOk(false));
+  }
 
 
   // Chatbot states
@@ -147,7 +174,11 @@ export default function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="min-h-screen p-6 md:p-8">
-      <div className="text-xs mb-2">Backend: {backendOk === null ? 'checking…' : backendOk ? 'online ✅' : 'offline ❌'}</div>
+      <div className="text-xs mb-2">
+        Backend: {backendOk === null ? 'checking…' : backendOk ? 'online ✅' : (
+          <span className="cursor-pointer underline decoration-dotted" title="Click to retry" onClick={manualRetryBackend}>offline ❌ (retry)</span>
+        )}
+      </div>
       {/* Top bar */}
       <header className="mb-8 flex items-center justify-between">
         <div>

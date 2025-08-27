@@ -1,3 +1,2 @@
 # Trigger file to force AWS EB deployment via GitHub Actions.
-# Updated: 2025-08-27
-# Status: Fixed conflicting .ebextensions - ready for clean deployment
+# Updated: 2025-08-26

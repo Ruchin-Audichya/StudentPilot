@@ -1,9 +1,9 @@
 branch-defaults:
   main:
-    environment: studentpilot-backend-env
+    environment: wheresmystipend-env-1
     group_suffix: null
 environment-defaults:
-  studentpilot-backend-env:
+  wheresmystipend-env-1:
     branch: null
     repository: null
 global:

@@ -7,7 +7,12 @@ if [ -z "$ORIGIN" ]; then
   exit 1
 fi
 
-echo "[SMOKE] Health" && curl -fsS "$ORIGIN/health" | head -c 400; echo
-echo "[SMOKE] Search" && curl -s -X POST "$ORIGIN/api/search" -H 'Content-Type: application/json' \
-  -d '{"query":"software","location":"","mode":"","min_stipend":0,"skills":[],"domains":[]}' | head -c 600; echo
+set -o pipefail
+echo "[SMOKE] Health" && HEALTH=$(curl -fsS -m 5 "$ORIGIN/health" | tee /dev/stderr)
+if [[ "$HEALTH" != *'"ok"'* ]]; then
+  echo "[SMOKE][FAIL] Health not ok" >&2; exit 1; fi
+echo "[SMOKE] Search" && RESP=$(curl -s -m 25 -X POST "$ORIGIN/api/search" -H 'Content-Type: application/json' \
+  -d '{"query":"software","filters":{"location":"India"}}') || true
+echo "$RESP" | head -c 600; echo
+if [[ -z "$RESP" ]]; then echo "[SMOKE][WARN] Empty search response" >&2; fi
 echo "[SMOKE] Done"

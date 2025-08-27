@@ -1,6 +1,12 @@
 # main.py - Full Feature + Speed + Variety + Buzzword Expansion
 
 import os
+try:
+    # Auto-load environment variables from a local .env file for easier OpenRouter key setup.
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
 import io
 import csv
 import re
@@ -20,16 +26,25 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 
 from scrapers.internshala import fetch_internships
-from scrapers.linkedin import fetch_linkedin_internships
+# LinkedIn scraper (Selenium) is imported lazily only if enabled to avoid heavy startup + Chromium deps.
+def _maybe_import_linkedin():
+    try:
+        from scrapers.linkedin import fetch_linkedin_internships  # type: ignore
+        return fetch_linkedin_internships
+    except Exception:
+        return lambda *a, **k: []  # graceful no-op
 
 # -----------------------------
 # AI / OpenRouter Configuration
 # -----------------------------
-OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
-OPENROUTER_MODELS = [m.strip() for m in os.getenv("OPENROUTER_MODELS", "qwen/qwen3-coder:free").split(",") if m.strip()]
-OPENROUTER_BASE = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions").strip()
-OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://example.com").strip() or "https://example.com"
-OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", "Career Copilot").strip() or "Career Copilot"
+def _openrouter_config():
+    """Fetch OpenRouter-related env vars dynamically so key changes don't require process restart."""
+    key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    models = [m.strip() for m in os.getenv("OPENROUTER_MODELS", "qwen/qwen3-coder:free").split(",") if m.strip()]
+    base = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions").strip()
+    site_url = os.getenv("OPENROUTER_SITE_URL", "https://example.com").strip() or "https://example.com"
+    site_name = os.getenv("OPENROUTER_SITE_NAME", "Career Copilot").strip() or "Career Copilot"
+    return key, models, base, site_url, site_name
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()  # (Future fallback)
 
 # Allow disabling heavier LinkedIn Selenium scraper (e.g. on platforms without Chromium)
@@ -49,29 +64,23 @@ _default_origins = (
     "http://localhost:8080,http://127.0.0.1:8080,http://127.0.0.1:5173,"
     "http://wheresmystipend-env-1.eba-bdf4swct.ap-south-1.elasticbeanstalk.com"
 )
-_cors_env = os.getenv("CORS_ORIGINS", _default_origins).strip()
-if _cors_env == "*":
-    # Wildcard: allow all origins (cannot combine with allow_credentials)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-        allow_credentials=False,
-    )
+_cors_env = os.getenv("CORS_ORIGINS", "").strip()
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
+if frontend_origin and not _cors_env:
+    allowed_origins = [frontend_origin]
 else:
-    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
-    # Tighten to explicit frontend origin if FRONTEND_ORIGIN set
-    frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
+    # fallback to default list if custom not provided
+    origins_raw = _cors_env or _default_origins
+    allowed_origins = [o.strip() for o in origins_raw.split(",") if o.strip()]
     if frontend_origin and frontend_origin not in allowed_origins:
         allowed_origins.append(frontend_origin)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=allowed_origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        allow_credentials=True,
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins or ["http://localhost:5173"],
+    allow_methods=["GET","POST","OPTIONS"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
 
 # Simple logging middleware (enabled when DEBUG_LOG=1)
 if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
@@ -91,6 +100,7 @@ if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
 # Basic health check for load balancers / EB
 @app.get("/health")
 def health_check():
+    """Fast health endpoint (no scraping, disk, or network) for EB / load balancers."""
     return {"status": "ok"}
 
 resume_text = ""
@@ -101,7 +111,7 @@ buzzword_roles = set()
 # -----------------------------
 # Load Buzzwords CSV
 # -----------------------------
-csv_path = os.path.join(os.path.dirname(__file__), "data", "btech_buzzwords.csv")
+csv_path = os.path.join(os.path.dirname(__file__), "btech_buzzwords.csv")
 if os.path.exists(csv_path):
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -225,9 +235,10 @@ def _dedupe(jobs: List[Dict]) -> List[Dict]:
 # -----------------------------
 import json, requests as _requests
 def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) -> str:
-    if not OPENROUTER_KEY or not user_message.strip():
+    key, models, base, site_url, site_name = _openrouter_config()
+    if not key or not user_message.strip():
         return ""
-    model = OPENROUTER_MODELS[0] if OPENROUTER_MODELS else "qwen/qwen3-coder:free"
+    model = models[0] if models else "qwen/qwen3-coder:free"
     system_prompt = (
         "You are a concise career assistant. Use bullet points. If giving advice, be specific and actionable. "
         "You are augmenting a heuristic response; avoid repeating obvious info."
@@ -248,25 +259,37 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) ->
         "max_tokens": 500,
     }
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": OPENROUTER_SITE_URL,
-        "X-Title": OPENROUTER_SITE_NAME,
+        "HTTP-Referer": site_url,
+        "X-Title": site_name,
     }
     try:
-        resp = _requests.post(OPENROUTER_BASE, json=payload, headers=headers, timeout=25)
+        resp = _requests.post(base, json=payload, headers=headers, timeout=40)
         resp.raise_for_status()
         data = resp.json()
-        # Try OpenAI-compatible structure
         choices = data.get("choices") or []
         if choices:
             content = choices[0].get("message", {}).get("content")
             if content:
                 return content.strip()
-        # Fallback raw
         return json.dumps(data)[:800]
-    except Exception:
+    except Exception as e:
+        if os.getenv("AI_DEBUG", "0") in {"1","true","yes"}:
+            import traceback, logging
+            logging.basicConfig(level=logging.INFO)
+            logging.error("OpenRouter call failed: %s", e)
+            logging.error("Trace: %s", traceback.format_exc())
         return ""
+
+@app.get("/api/ai-test")
+def ai_test():
+    """Quick diagnostic to verify OpenRouter connectivity (no resume context)."""
+    key, models, *_ = _openrouter_config()
+    if not key:
+        return {"ok": False, "reason": "OPENROUTER_API_KEY not set in environment"}
+    sample = _ai_enhanced_response("Return one word: ping", "", {})
+    return {"ok": bool(sample), "sample": sample or None, "model": models[:1]}
 
 # -----------------------------
 # Models
@@ -275,8 +298,8 @@ class Filters(BaseModel):
     location: Optional[str] = None
 
 class SearchRequest(BaseModel):
-    query: str
-    filters: Filters
+    query: str = ""
+    filters: Optional[Filters] = None
 
 class Internship(BaseModel):
     source: str
@@ -293,6 +316,23 @@ class Internship(BaseModel):
 class ChatRequest(BaseModel):
     message: str
 
+class UserLog(BaseModel):
+    uid: str
+    is_anonymous: bool = True
+    email: Optional[str] = None
+    platform: Optional[str] = None
+    app_version: Optional[str] = None
+
+_user_events: List[Dict] = []  # in-memory only; rotate/limit
+
+@app.post("/api/log-user")
+def log_user(evt: UserLog):
+    # Keep max 500 recent
+    _user_events.append({"t": datetime.utcnow().isoformat(), **evt.dict()})
+    if len(_user_events) > 500:
+        del _user_events[: len(_user_events) - 500]
+    return {"ok": True, "count": len(_user_events)}
+
 # Simple status endpoint for frontend to detect resume/session profile
 @app.get("/api/resume-status")
 def resume_status():
@@ -303,14 +343,47 @@ def resume_status():
         "location": resume_profile.get("location"),
     }
 
+@app.get("/api/diagnostics")
+def diagnostics():
+    """Lightweight internal snapshot (no secrets). Helps pre-deploy sanity checks.
+    Avoid calling excessively (scraper sample hit)."""
+    key_present = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
+    # Run one very small scrape (python internship India) with existing utility
+    sample_jobs = []
+    try:
+        sample_jobs = fetch_internships("python internship", "India")[:3]
+    except Exception:
+        sample_jobs = []
+    return {
+        "health": "ok",
+        "openrouter_configured": key_present,
+        "linkedin_enabled": not DISABLE_LINKEDIN,
+        "resume_loaded": bool(resume_text),
+        "resume_skill_count": len(resume_profile.get("skills", [])),
+        "resume_role_count": len(resume_profile.get("roles", [])),
+        "user_log_events": len(_user_events),
+        "sample_scrape_jobs": len(sample_jobs),
+        "sample_scrape_titles": [j.get("title") for j in sample_jobs],
+        "fallback_hint": "If sample_scrape_jobs is 0 repeatedly, scraping may be blocked/network-offline.",
+        "ai_hint": "Chat will augment replies only when openrouter_configured is true.",
+    }
+
 # -----------------------------
 # Search Endpoint
 # -----------------------------
 @app.post("/api/search", response_model=List[Internship])
 def search_internships(req: SearchRequest):
     global resume_text, resume_profile
+    # Backward compatibility: allow legacy body with top-level 'location' key
+    body_extra_location = None
+    try:
+        from fastapi import Request as _FReq  # type: ignore
+    except Exception:
+        _FReq = None  # type: ignore
     user_q = (req.query or "").strip()
-    location = (req.filters.location or resume_profile.get("location") or "India")
+    loc_fallback = "India"
+    loc_from_filters = req.filters.location if req.filters else None  # type: ignore
+    location = loc_from_filters or resume_profile.get("location") or loc_fallback
 
     # Blended queries: user + resume + buzzword roles + fallback
     queries = set()
@@ -327,22 +400,48 @@ def search_internships(req: SearchRequest):
 
     # Run scrapers in parallel
     all_jobs = []
+    debug_scrapers = os.getenv("DEBUG_SCRAPERS", "0") in {"1","true","yes"}
+    if debug_scrapers:
+        print(f"[scrape] starting queries={len(queries)} -> {list(queries)[:6]}")
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = []
         for q in queries:
             futures.append(executor.submit(fetch_internships, q, location))
             if not DISABLE_LINKEDIN:
-                futures.append(executor.submit(fetch_linkedin_internships, q, location))
+                linkedin_fetch = _maybe_import_linkedin()
+                futures.append(executor.submit(linkedin_fetch, q, location))
         for f in as_completed(futures):
             try:
                 jobs = f.result()
                 if jobs:
                     all_jobs.extend(jobs)
+                    if debug_scrapers:
+                        print(f"[scrape] got {len(jobs)} jobs (total {len(all_jobs)})")
             except Exception:
+                if debug_scrapers:
+                    import traceback
+                    print("[scrape] worker failed:\n", traceback.format_exc())
                 pass
 
     if not all_jobs:
-        return []
+        # Fallback: return synthetic sample results so UI still functions
+        if debug_scrapers:
+            print("[scrape] no real jobs fetched, returning fallback samples")
+        sample = []
+        base_terms = list(queries)[:3] or ["internship"]
+        for i, term in enumerate(base_terms):
+            sample.append({
+                "source": "sample",
+                "title": f"{term.title()} Internship (Sample)",
+                "company": "CompanyX",
+                "location": location,
+                "stipend": None,
+                "apply_url": f"https://example.com/apply/{i}",
+                "description": f"Placeholder listing for '{term}'. Real scraping returned no results (likely blocked or offline).",
+                "tags": ["sample", "offline-mode"],
+                "posted": "today",
+            })
+        all_jobs = sample
 
     # Deduplicate
     all_jobs = _dedupe(all_jobs)
@@ -475,26 +574,6 @@ def chat_with_ai(req: ChatRequest):
             *[f"  - {s}" for s in next_steps],
         ]
         return {"response": "\n".join(out)}
-        improvements = [
-            "Use action verbs (Built, Led, Achieved) + metrics (↑%, ↓ms).",
-            "Add 2–3 impact bullets per experience; keep to one page if early career.",
-            "Mirror 6–8 keywords from the target JD.",
-        ]
-        next_steps = [
-            "Pick 3 target roles and tailor bullets for each.",
-            "Add a ‘PROJECTS’ section with GitHub links.",
-            "Place email/phone and a short headline at the top.",
-        ]
-        out = [
-            f"- SUMMARY: Score: {score10}/10 — solid base with room to polish.",
-            "- STRENGTHS:",
-            *[f"  - {s}" for s in strengths],
-            "- IMPROVEMENTS:",
-            *[f"  - {s}" for s in improvements],
-            "- NEXT STEPS:",
-            *[f"  - {s}" for s in next_steps],
-        ]
-        return {"response": "\n".join(out)}
 
     # Skill gap analysis
     if has("skill gap", "gap analysis", "missing skills"):
@@ -558,10 +637,12 @@ def chat_with_ai(req: ChatRequest):
         *[f"  - {t}" for t in tips],
     ]
     # If OpenRouter key available, send the user message + resume context to model
-    if OPENROUTER_KEY:
+    if _openrouter_config()[0]:  # key present
         ai_extra = _ai_enhanced_response(msg, resume_text, resume_profile)
         if ai_extra:
             out.append("- AI SUGGESTION:\n" + ai_extra)
+        else:
+            out.append("- AI NOTE: Model call failed or returned empty; retry later.")
     return {"response": "\n".join(out)}
 
 # -----------------------------
@@ -635,4 +716,75 @@ async def upload_resume(file: UploadFile = File(...)):
         "roles": sorted(list(resume_profile["roles"]))[:10],
         "location": resume_profile.get("location"),
         "sample_text": resume_text[:400]
+    }
+
+# -----------------------------
+# System Check Endpoint (deeper diagnostics for internal use)
+# -----------------------------
+@app.get("/api/system-check")
+def system_check():
+    """Run lightweight in-process assertions to confirm subsystems.
+
+    Returns:
+      health: always 'ok' if endpoint executes
+      components: dict with status booleans
+      notes: guidance for any failing component
+    """
+    notes = []
+    # Scraper sample
+    scraper_ok = False
+    sample_titles = []
+    try:
+        sample = fetch_internships("python internship", "India")
+        scraper_ok = len(sample) > 0
+        sample_titles = [j.get("title") for j in sample[:3]]
+        if not scraper_ok:
+            notes.append("Internshala returned 0 items; may be blocked or network offline. UI will fall back to samples.")
+    except Exception as e:
+        notes.append(f"Internshala scraper error: {e}")
+
+    # LinkedIn optional
+    linkedin_ok = False
+    if not DISABLE_LINKEDIN:
+        try:
+            lk_fn = _maybe_import_linkedin()
+            lk_sample = lk_fn("python internship", "India")
+            linkedin_ok = len(lk_sample) >= 0  # even empty is 'reachable'
+        except Exception as e:
+            notes.append(f"LinkedIn scraper import/run failed: {e}")
+    else:
+        notes.append("LinkedIn scraper disabled (DISABLE_LINKEDIN=1). This is expected if Selenium/Chromium not available.")
+
+    # AI readiness
+    key_present = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
+    ai_sample = None
+    if key_present:
+        ai_sample = _ai_enhanced_response("Return one word: pong", resume_text[:2000], resume_profile)
+        if not ai_sample:
+            notes.append("OpenRouter key set but model returned empty response (possible network issue or rate limit).")
+    else:
+        notes.append("No OPENROUTER_API_KEY set; chat will operate in heuristic-only mode.")
+
+    # Resume state
+    resume_ok = bool(resume_text)
+    if not resume_ok:
+        notes.append("No resume uploaded yet; some chat features limited.")
+
+    return {
+        "health": "ok",
+        "components": {
+            "scraper_internshala": scraper_ok,
+            "scraper_linkedin_enabled": not DISABLE_LINKEDIN,
+            "scraper_linkedin_reachable": linkedin_ok if not DISABLE_LINKEDIN else None,
+            "ai_configured": key_present,
+            "resume_loaded": resume_ok,
+            "user_events_cached": len(_user_events),
+        },
+        "sample": {
+            "internshala_titles": sample_titles,
+            "ai_reply_excerpt": (ai_sample[:150] if ai_sample else None),
+            "skills_count": len(resume_profile.get("skills", [])),
+            "roles_count": len(resume_profile.get("roles", [])),
+        },
+        "notes": notes,
     }
