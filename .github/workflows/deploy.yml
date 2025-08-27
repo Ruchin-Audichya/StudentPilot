@@ -55,12 +55,14 @@ jobs:
         run: |
           set -euo pipefail
           APP_NAME="WheresMyStipend"
-            ENV_NAME="WheresMyStipend-env-2"
+          ENV_NAME="WheresMyStipend-env-2"
           REGION="ap-south-1"
           INTERVAL=20
           TIMEOUT=900  # 15 minutes
+          EVENTS_INTERVAL=60
           echo "Waiting for environment $ENV_NAME in app $APP_NAME to become Ready (timeout ${TIMEOUT}s, interval ${INTERVAL}s)..."
           start=$(date +%s)
+          last_events_dump=$start
           while true; do
             now=$(date +%s)
             elapsed=$(( now - start ))
@@ -77,12 +79,21 @@ jobs:
               --query 'Environments[0].Health' \
               --output text 2>/dev/null || echo "Unknown")
             echo "Status: $status | Health: $health | Elapsed: ${elapsed}s"
+            # Periodically show last 25 events (every 60s)
+            if [ $(( now - last_events_dump )) -ge $EVENTS_INTERVAL ]; then
+              echo "--- Recent EB Events (last 25) ---"
+              aws elasticbeanstalk describe-events --environment-name "$ENV_NAME" --region "$REGION" --max-items 25 \
+                --query 'Events[].{Time:EventDate,Severity:Severity,Message:Message}' --output table || true
+              last_events_dump=$now
+            fi
             if [ "$status" = "Ready" ]; then
               echo "Environment is Ready. Proceeding to deploy."
               break
             fi
             if [ $elapsed -ge $TIMEOUT ]; then
-              echo "ERROR: Environment not Ready after ${elapsed}s (last status: $status)." >&2
+              echo "ERROR: Environment not Ready after ${elapsed}s (last status: $status). Dumping final 25 events:" >&2
+              aws elasticbeanstalk describe-events --environment-name "$ENV_NAME" --region "$REGION" --max-items 25 \
+                --query 'Events[].{Time:EventDate,Severity:Severity,Message:Message}' --output table || true
               exit 1
             fi
             sleep $INTERVAL
