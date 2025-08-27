@@ -58,6 +58,26 @@ Backend (set in EB / Render dashboard):
 | DISABLE_LINKEDIN | Skip Selenium scraping | 1 |
 | CORS_ORIGINS | Extra allowed origins | https://foo.app,https://bar.dev |
 
+### Deployment Environment Variables
+
+Elastic Beanstalk (Console → Environment → Configuration → Software → Environment properties):
+```
+CORS_ORIGINS=https://wms-virid-six.vercel.app
+FRONTEND_ORIGIN=https://wms-virid-six.vercel.app
+DISABLE_LINKEDIN=1
+OPENROUTER_API_KEY=<your-key>
+```
+
+Railway (Project → Variables):
+```
+CORS_ORIGINS=https://wms-virid-six.vercel.app
+FRONTEND_ORIGIN=https://wms-virid-six.vercel.app
+DISABLE_LINKEDIN=1
+OPENROUTER_API_KEY=<your-key>
+```
+
+Procfile uses dynamic port binding (`${PORT:-8000}`) so Railway injects a runtime port while EB keeps default 8000.
+
 Frontend (Vercel env):
 | Name | Purpose |
 |------|---------|
