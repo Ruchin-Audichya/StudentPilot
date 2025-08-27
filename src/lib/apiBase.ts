@@ -10,8 +10,9 @@ function computeApiBase(): string {
   const cleaned = raw?.trim();
   const isVercel = isBrowser && window.location.hostname.endsWith('vercel.app');
   if (isVercel) {
+    // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
     if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
-      return '/api/backend';
+      return 'https://wheres-my-stipend-wms.onrender.com';
     }
     return cleaned.replace(/\/$/, '');
   }
