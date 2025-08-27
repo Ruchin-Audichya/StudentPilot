@@ -41,10 +41,10 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 EXPOSE 8000
 
-# Start command - use shell form for variable expansion
-CMD gunicorn -k uvicorn.workers.UvicornWorker main:app \
+# Start command - use simple main for testing
+CMD gunicorn -k uvicorn.workers.UvicornWorker simple_main:app \
     --bind 0.0.0.0:${PORT} \
-    --workers ${WORKERS:-2} \
-    --timeout ${TIMEOUT:-120} \
+    --workers 1 \
+    --timeout 120 \
     --access-logfile - \
     --error-logfile -

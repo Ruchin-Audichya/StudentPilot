@@ -2,8 +2,8 @@
 // Helps avoid mixed-content (HTTPS -> HTTP) and hides backend origin.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Configure in Vercel project settings: EB_BACKEND_ORIGIN = http://wheresmystipend-env-1.eba-bdf4swct.ap-south-1.elasticbeanstalk.com
-const ORIGIN = (process.env.EB_BACKEND_ORIGIN || process.env.BACKEND_ORIGIN || '').replace(/\/$/, '');
+// Configure in Vercel project settings: EB_BACKEND_ORIGIN = http://studentpilot-backend-env.ap-south-1.elasticbeanstalk.com
+const ORIGIN = (process.env.EB_BACKEND_ORIGIN || process.env.BACKEND_ORIGIN || 'http://studentpilot-backend-env.ap-south-1.elasticbeanstalk.com').replace(/\/$/, '');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!ORIGIN) {
