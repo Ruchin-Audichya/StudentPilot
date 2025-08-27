@@ -5,16 +5,16 @@
   "rewrites": [
     {
       "source": "/api/backend/health",
-      "destination": "https://studentpilot.onrender.com/health"
+      "destination": "https://wheres-my-stipend-wms.onrender.com/health"
     },
     {
       "source": "/api/backend/(.*)",
-      "destination": "https://studentpilot.onrender.com/$1"
+      "destination": "https://wheres-my-stipend-wms.onrender.com/$1"
     },
     {
       "source": "/api/backend",
-      "destination": "https://studentpilot.onrender.com"
+      "destination": "https://wheres-my-stipend-wms.onrender.com"
     }
   ],
-  "_note_previous_env_based": "Original env-based rewrites replaced by fixed backend domain to bypass BACKEND_ORIGIN env mismatch. Restore if you want dynamic: rewrites:[{source:'/api/backend/(.*)',destination:'${env.BACKEND_ORIGIN}/$1'},{source:'/api/backend',destination:'${env.BACKEND_ORIGIN}'}]"
+  "_note_previous_env_based": "Hard-coded to https://wheres-my-stipend-wms.onrender.com. For dynamic env-based version: rewrites:[{source:'/api/backend/(.*)',destination:'${env.BACKEND_ORIGIN}/$1'},{source:'/api/backend',destination:'${env.BACKEND_ORIGIN}'}]"
 }
