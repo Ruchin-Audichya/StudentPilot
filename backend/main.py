@@ -71,6 +71,9 @@ _default_origins = (
 )
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
+# Normalize trailing slash early so single-origin mode matches browser Origin header
+if frontend_origin.endswith('/'):
+    frontend_origin = frontend_origin[:-1]
 if frontend_origin and not _cors_env:
     allowed_origins = [frontend_origin]
 else:
@@ -87,7 +90,7 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins or ["http://localhost:5173"],
-    allow_methods=["GET","POST","OPTIONS"],
+    allow_methods=["GET","POST","OPTIONS","HEAD"],  # include HEAD for health probes
     allow_headers=["*"],
     allow_credentials=True,
 )
