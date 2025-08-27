@@ -34,7 +34,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [uploaded, setUploaded] = useState(false);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
-  // Backend health polling: initial + retries (handles case where frontend starts before backend)
+  // Backend health polling: try both direct base and rewrite prefix to avoid false 'offline' when rewrites misconfigured
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
@@ -43,10 +43,24 @@ export default function Dashboard({ profile }: DashboardProps) {
       if (cancelled) return;
       attempts++;
       try {
-        const r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+        // First try direct base /health
+        let success = false;
+        let r: Response | null = null;
+        try {
+          r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+          success = r.ok;
+        } catch {}
+        // If that failed and API_BASE already ends with /api/backend (rewrite style), attempt without that segment
+        if (!success && /\/api\/backend$/.test(API_BASE)) {
+          const alt = API_BASE.replace(/\/api\/backend$/, '');
+          try {
+            const r2 = await fetch(`${alt}/health`, { cache: 'no-store' });
+            success = r2.ok;
+          } catch {}
+        }
         if (!cancelled) {
-          setBackendOk(r.ok);
-          if (!r.ok && attempts < maxAttempts) setTimeout(check, 2000);
+          setBackendOk(success);
+          if (!success && attempts < maxAttempts) setTimeout(check, 2000);
         }
       } catch (e) {
         if (!cancelled) {
@@ -62,9 +76,25 @@ export default function Dashboard({ profile }: DashboardProps) {
   function manualRetryBackend() {
     setBackendOk(null);
     // Trigger a one-off recheck
-    fetch(`${API_BASE}/health`, { cache: 'no-store' })
-      .then(r => setBackendOk(r.ok))
-      .catch(() => setBackendOk(false));
+    (async () => {
+      try {
+        let ok = false;
+        try {
+          const r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+          ok = r.ok;
+        } catch {}
+        if (!ok && /\/api\/backend$/.test(API_BASE)) {
+          const alt = API_BASE.replace(/\/api\/backend$/, '');
+          try {
+            const r2 = await fetch(`${alt}/health`, { cache: 'no-store' });
+            ok = r2.ok;
+          } catch {}
+        }
+        setBackendOk(ok);
+      } catch {
+        setBackendOk(false);
+      }
+    })();
   }
 
 
