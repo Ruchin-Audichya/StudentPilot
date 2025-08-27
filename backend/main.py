@@ -25,7 +25,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 
-from scrapers.internshala import fetch_internships
+# Safe import for scraper (never break app startup on EB)
+try:
+    from scrapers.internshala import fetch_internships  # type: ignore
+except Exception:  # pragma: no cover - fallback path
+    def fetch_internships(*args, **kwargs):  # type: ignore
+        return []
 # LinkedIn scraper (Selenium) is imported lazily only if enabled to avoid heavy startup + Chromium deps.
 def _maybe_import_linkedin():
     try:
