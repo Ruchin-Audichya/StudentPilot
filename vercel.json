@@ -4,12 +4,17 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/backend/health",
+      "destination": "https://studentpilot.onrender.com/health"
+    },
+    {
       "source": "/api/backend/(.*)",
-      "destination": "${env.BACKEND_ORIGIN}/$1"
+      "destination": "https://studentpilot.onrender.com/$1"
     },
     {
       "source": "/api/backend",
-      "destination": "${env.BACKEND_ORIGIN}"
+      "destination": "https://studentpilot.onrender.com"
     }
-  ]
+  ],
+  "_note_previous_env_based": "Original env-based rewrites replaced by fixed backend domain to bypass BACKEND_ORIGIN env mismatch. Restore if you want dynamic: rewrites:[{source:'/api/backend/(.*)',destination:'${env.BACKEND_ORIGIN}/$1'},{source:'/api/backend',destination:'${env.BACKEND_ORIGIN}'}]"
 }
