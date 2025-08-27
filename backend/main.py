@@ -77,8 +77,13 @@ else:
     # fallback to default list if custom not provided
     origins_raw = _cors_env or _default_origins
     allowed_origins = [o.strip() for o in origins_raw.split(",") if o.strip()]
+    # Normalize (strip trailing slashes) so a value like https://example.com/ still matches browser Origin header
+    allowed_origins = [o[:-1] if o.endswith('/') else o for o in allowed_origins]
     if frontend_origin and frontend_origin not in allowed_origins:
-        allowed_origins.append(frontend_origin)
+        # Ensure normalized as well
+        fe_norm = frontend_origin[:-1] if frontend_origin.endswith('/') else frontend_origin
+        if fe_norm not in allowed_origins:
+            allowed_origins.append(fe_norm)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins or ["http://localhost:5173"],
