@@ -80,19 +80,13 @@ export default function ChatWidget({
       { id: assistantId, text: "", isUser: false, timestamp: new Date() },
     ]);
     try {
-      const userAndHistory = [
-        ...messages.map((m) => ({
-          role: m.isUser ? ("user" as "user") : ("assistant" as "assistant"),
-          content: m.text,
-        })),
-        { role: "user" as "user", content: text },
-      ];
+      // Only pass message and model, not messages array
       const stream = streamChat({
+        message: text,
         model: selectedModel,
-        messages: userAndHistory,
         signal: abortController.current.signal,
       });
-      for await (const token of await stream) {
+      for await (const token of stream) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, text: m.text + token } : m

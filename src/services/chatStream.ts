@@ -2,22 +2,18 @@
 import { API_BASE } from "@/lib/apiBase";
 
 export async function* streamChat({
+  message,
   model,
-  messages,
   signal,
 }: {
+  message: string;
   model: string;
-  messages: { role: "system" | "user" | "assistant"; content: string }[];
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
   // Temporarily disable streaming; use non-stream POST to backend
   const body = {
-    model: model || "openai/gpt-oss-20b:free",
-    messages: [
-      { role: "system", content: "You are a resume-aware assistant. Keep replies short, bullet-pointed, with light emojis." },
-      ...messages,
-    ],
-    stream: false
+    message,
+    model: model || "openai/gpt-oss-20b:free"
   };
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
@@ -26,12 +22,14 @@ export async function* streamChat({
       body: JSON.stringify(body),
       signal
     });
-    if (!res.ok) {
-      yield `⚠️ Chat request failed: ${res.status}`;
-      return;
-    }
     const data = await res.json();
-    yield data.response || "No response";
+    if (data.response) {
+      yield data.response;
+    } else if (data.choices?.[0]?.message?.content) {
+      yield data.choices[0].message.content;
+    } else {
+      yield "No response";
+    }
   } catch (err) {
     yield `⚠️ Chat request failed: ${err}`;
   }

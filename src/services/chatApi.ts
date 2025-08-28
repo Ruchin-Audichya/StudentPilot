@@ -83,62 +83,54 @@ function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 /** Main entry used by the component. Tries your free models in priority order. */
 export async function chatWithAssistant(
   message: string,
-  profile: ChatProfile,
-  history: ChatHistoryItem[] = [],
-  opts?: { model?: FreeModel; signal?: AbortSignal }
+  selectedModel?: string,
+  opts?: { signal?: AbortSignal; idToken?: string }
 ): Promise<string> {
   const body = {
-    model: opts?.model || "openai/gpt-oss-20b:free",
-    messages: [
-      { role: "system", content: "You are a resume-aware assistant. Keep replies short, bullet-pointed, with light emojis." },
-      ...history.map(m => ({ role: m.isUser ? "user" : "assistant", content: m.text })),
-      { role: "user", content: message }
-    ],
-    stream: false
+    message,
+    model: selectedModel || "openai/gpt-oss-20b:free"
   };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (opts?.idToken) headers["id_token"] = opts.idToken;
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
       signal: opts?.signal
     });
-    if (!res.ok) {
-      return `⚠️ Chat request failed: ${res.status}`;
-    }
     const data = await res.json();
-    return data.response || "No response";
+    if (data.response) return data.response;
+    if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+    return "No response";
   } catch (err) {
     return `⚠️ Chat request failed: ${err}`;
   }
 }
 
-export async function chatCompletion({ message, history, selectedModel }: {
+export async function chatCompletion({ message, selectedModel, idToken }: {
   message: string;
-  history: { isUser: boolean; text: string }[];
   selectedModel?: string;
+  idToken?: string;
 }) {
   const body = {
-    model: selectedModel || "openai/gpt-oss-20b:free",
-    messages: [
-      { role: "system", content: "You are a resume-aware assistant. Keep replies short, bullet-pointed, with light emojis." },
-      ...history.map(m => ({ role: m.isUser ? "user" : "assistant", content: m.text })),
-      { role: "user", content: message }
-    ],
-    stream: false
+    message,
+    model: selectedModel || "openai/gpt-oss-20b:free"
   };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (idToken) headers["id_token"] = idToken;
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body)
     });
-    if (!res.ok) {
-      return { error: `⚠️ Chat request failed: ${res.status}` };
-    }
-    return await res.json();
+    const data = await res.json();
+    if (data.response) return data.response;
+    if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+    return "No response";
   } catch (err) {
-    return { error: `⚠️ Chat request failed: ${err}` };
+    return `⚠️ Chat request failed: ${err}`;
   }
 }
 
