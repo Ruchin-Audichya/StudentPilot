@@ -3,26 +3,36 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "@/styles/markdown.css";
 
-interface MarkdownMessageProps {
-  text: string;
-}
-
-const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ text }) => (
-  <div className="markdown-message">
+export default function MarkdownMessage({ text }: { text: string }) {
+  return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        a: ({ node, ...props }) => (
+        a: (props) => (
           <a {...props} target="_blank" rel="noopener noreferrer" />
         ),
-        code: ({ node, className, children, ...props }) => (
-          <code className={className} {...props}>{children}</code>
+        strong: (props) => <strong style={{ fontWeight: 600 }} {...props} />,
+        h2: (props) => (
+          <h2 style={{ marginTop: "0.5rem", fontWeight: 700 }} {...props} />
+        ),
+        h3: (props) => (
+          <h3 style={{ marginTop: "0.5rem", fontWeight: 700 }} {...props} />
+        ),
+        li: (props) => <li style={{ margin: "0.12rem 0" }} {...props} />,
+        code: (props) => (
+          <code
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              padding: ".08rem .28rem",
+              borderRadius: "4px",
+              fontSize: ".86em",
+            }}
+            {...props}
+          />
         ),
       }}
     >
       {text}
     </ReactMarkdown>
-  </div>
-);
-
-export default MarkdownMessage;
+  );
+}

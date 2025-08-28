@@ -227,7 +227,13 @@ export default function ChatWidget({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
-            <div className={m.isUser ? "wm-bubble user text-[14px] md:text-[15px]" : "wm-bubble bot text-[14px] md:text-[15px]"}>
+            <div
+              className={
+                m.isUser
+                  ? "wm-bubble user bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] md:text-[15px] px-4 py-3 rounded-2xl shadow-lg max-w-[85%] ml-auto"
+                  : "wm-bubble bot text-[15px] md:text-[16px] leading-relaxed text-slate-100 bg-white/5 backdrop-blur-md border border-white/10 px-4 py-3 rounded-2xl shadow-md max-w-[85%]"
+              }
+            >
               <MarkdownMessage text={m.text} />
             </div>
           </motion.div>
