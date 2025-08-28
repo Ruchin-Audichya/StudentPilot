@@ -2,6 +2,8 @@
 
 # StudentPilot (Where’s My Stipend) 💸
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-StudentPilot-blue?style=for-the-badge)](https://studentpilot.vercel.app)
+
 Career + internship copilot: upload a resume, instantly extract skills & roles, fetch fresh internships, and chat with an AI tuned for concise, actionable career advice.
 
 ![Hero](./src/assets/hero-nexus.jpg)
@@ -27,26 +29,83 @@ AI: OpenRouter (model list via `OPENROUTER_MODELS`)
 Deployment: Vercel (frontend) + Render (backend)
 Auth/Data: Firebase (anonymous) – optional; app still works without it.
 
-## Quick Start (Local)
-Backend:
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-$env:DISABLE_LINKEDIN='1'   # keep Selenium off locally
-# (optional) $env:OPENROUTER_API_KEY='sk-or-...'
-uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-Frontend (new terminal):
-```powershell
+---
+
+## 🚀 Quick Start
+
+### Frontend
+```sh
 npm install
-$env:VITE_API_BASE='http://127.0.0.1:8000' # For local dev only
 npm run dev
 ```
-Visit: http://localhost:5173
 
-Upload a resume → see extracted skills (hit `/api/resume-status`) → search internships → chat.
+### Backend
+```sh
+cd backend
+pip install -r requirements.txt
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+- Make sure both servers are running and connected via `VITE_API_BASE` (see below).
+- Visit: http://localhost:5173
+
+---
+
+## 🌐 Environment Variables
+
+### Frontend
+- `VITE_API_BASE`: The backend API base URL (e.g. `http://127.0.0.1:8000` for local dev, or your Render/EB URL for production).
+
+### Backend
+- `OPENROUTER_API_KEY`: Your OpenRouter API key for AI chat.
+- `OPENROUTER_MODELS`: Comma-separated list of model IDs (e.g. `openai/gpt-oss-20b:free,qwen/qwen3-coder:free`). First entry is default.
+- `CORS_ORIGINS`: Comma-separated list of allowed origins (e.g. `https://yourapp.vercel.app,https://foo.app`).
+- `FRONTEND_ORIGIN`: Strict CORS allowlist for frontend.
+- `DISABLE_LINKEDIN`: Set to `1` to skip Selenium scraping.
+
+---
+
+## ✨ Key UI Features
+- Glassmorphic design across chat, auth, dashboard.
+- Streaming chat replies (real-time AI output).
+- Markdown-rendered messages in chat bubbles.
+- Resume badge toggle and model switcher in chat header.
+- Mobile-first, responsive layout for all screens.
+
+---
+
+## 🛠️ Developer Guide
+- Folder layout:
+  - `src/components`: All UI components (chat, dashboard, onboarding, etc.)
+  - `src/services`: API clients and business logic
+  - `src/pages`: Top-level pages/routes
+  - `src/assets`: Images and static assets
+- Copilot guardrail: See `.copilot-instructions.md` for agent rules and best practices.
+- Styling: Use `wm-*` classes for custom glass styles. Never duplicate Tailwind utilities—compose with classes instead.
+
+---
+
+## 🚢 Deployment
+
+### Frontend (Vercel)
+- Automatic deploy on push to `main` branch.
+- Quick push:
+```sh
+git add src/components/Dashboard.tsx src/components/ChatWidget.tsx src/services/chatApi.ts
+git commit -m "fix(chat): correct OpenRouter payload, resume badge logic, and header alignment"
+git push origin main
+```
+- Set `VITE_API_BASE` in Vercel project settings to your backend URL if needed.
+
+### Backend (Elastic Beanstalk / Render)
+- Elastic Beanstalk: See below for Docker setup and environment variables.
+- Render: Connect repo, set Python runtime, add env vars, deploy. Health check at `/health`.
+
+---
+
+## Existing Sections
+
+<!-- All previous content below remains unchanged, including environment variable tables, deployment details, Firebase integration, AI chat, fallback behavior, cleaning, testing, roadmap, demo flow, architecture, license, and credits. -->
 
 ## Environment Variables
 Backend (set in Render dashboard):
