@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { MessageCircle, X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,17 +29,25 @@ export const ChatWidget = ({ profile }: ChatWidgetProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: `Hi ${profile.name}! I'm your AI career assistant. I can help you with career advice, skill development, and internship guidance. What would you like to know?`,
+      text: `👋 Hi ${profile.name}! I'm your AI career assistant. I can help you with career advice, skill development, and internship guidance. What would you like to know?`,
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const faqSuggestions = [
+    'Rate my resume',
+    'Skill gap for backend',
+    'Who am I?',
+    '3-step plan for paid internship this month',
+    'How to improve my resume?',
+    'What are my strengths and weaknesses?',
+    'Suggest internships for me',
+  ];
 
   const sendMessageToAI = async (message: string) => {
     setIsLoading(true);
-    
     try {
       const history: ChatHistoryItem[] = messages.map(m => ({ text: m.text, isUser: m.isUser }));
       const chatProfile: ChatProfile = {
@@ -50,7 +59,6 @@ export const ChatWidget = ({ profile }: ChatWidgetProps) => {
         interests: profile.interests,
       };
       const reply = await chatWithAssistant(message, chatProfile, history);
-
       const aiMessage: Message = {
         id: Date.now().toString(),
         text: reply,
@@ -60,10 +68,9 @@ export const ChatWidget = ({ profile }: ChatWidgetProps) => {
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('AI API Error:', error);
-      // Error handling - you can customize this
       const errorMessage: Message = {
         id: Date.now().toString(),
-        text: "Sorry, I'm having trouble connecting right now. Please try again later.",
+        text: "❌ Sorry, I'm having trouble connecting right now. Please try again later.",
         isUser: false,
         timestamp: new Date(),
       };
@@ -75,38 +82,53 @@ export const ChatWidget = ({ profile }: ChatWidgetProps) => {
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
-
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       text: inputText,
       isUser: true,
       timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-
-    // Send to AI
-    await sendMessageToAI(inputText);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  return (
-    <>
-      {/* Chat Toggle Button */}
-      <Button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-300 z-50"
-        size="icon"
-      >
-        {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+    return (
+      <Card className="fixed bottom-4 right-4 w-full max-w-md z-50 shadow-2xl rounded-xl animate-fadein">
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2 border-b bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
+            <span className="font-bold text-lg flex items-center gap-2"><MessageCircle /> Career Chatbot</span>
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}><X /></Button>
+          </div>
+          <div className="px-4 py-2 h-80 overflow-y-auto flex flex-col gap-2 bg-white">
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={`rounded-lg px-3 py-2 whitespace-pre-line ${msg.isUser ? 'bg-blue-100 text-blue-900 self-end' : 'bg-gray-50 text-gray-900 self-start'} shadow-sm`}
+              >
+                {msg.text}
+              </motion.div>
+            ))}
+          </div>
+          <div className="px-4 py-2 border-t bg-gray-50 flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2 mb-2">
+              {faqSuggestions.map((faq, idx) => (
+                <Button key={idx} variant="outline" size="sm" onClick={() => { setInputText(faq); handleSendMessage(); }}>
+                  {faq}
+                </Button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-center">
+              <Input
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Ask about internships, skills, resume..."
+                disabled={isLoading}
+              />
+              <Button onClick={handleSendMessage} disabled={isLoading || !inputText.trim()}><Send /></Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
       </Button>
 
       {/* Chat Widget */}
