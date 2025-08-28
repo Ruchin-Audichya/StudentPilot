@@ -1,115 +1,64 @@
 import { useState } from "react";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
-import Cookies from "js-cookie";
-import { auth } from "@/lib/firebase"; // ✅ use your firebase.ts export
-import { linkAnonymousAccount } from "@/services/onboardingService";
+
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      let userCredential;
-      if (isSignUp) {
-        // Try linking current (possibly anonymous) user to email/password
-        try {
-          const linked = await linkAnonymousAccount(email, password);
-          if (linked) {
-            userCredential = { user: linked } as any;
-          } else {
-            userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          }
-        } catch (linkErr) {
-          // Fallback to create user if linking failed (e.g., no anon user)
-          userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        }
-      } else {
-        // If already anonymous, try linking to this email/password
-        try {
-          const linked = await linkAnonymousAccount(email, password);
-          if (linked) {
-            userCredential = { user: linked } as any;
-          } else {
-            userCredential = await signInWithEmailAndPassword(auth, email, password);
-          }
-        } catch (linkErr) {
-          userCredential = await signInWithEmailAndPassword(auth, email, password);
-        }
-      }
-      Cookies.set("user", userCredential.user.uid, { expires: 7 });
-      navigate("/onboarding");
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
 
   return (
-    <div className="bg-black text-white min-h-screen flex items-center justify-center">
-      {/* Card container */}
-      <div className="bg-[#0d0d0d] border border-gray-800 rounded-xl shadow-lg w-full max-w-sm p-8">
-        <h1 className="text-2xl font-bold text-center mb-6">
-          {isSignUp ? "Create an Account" : "Welcome Back"}
+    <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
+      {/* Ambient gradient blobs */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden
+        style={{
+          background: `
+            radial-gradient(600px 300px at 20% 20%, rgba(99,102,241,0.4), transparent 60%),
+            radial-gradient(500px 280px at 80% 0%, rgba(236,72,153,0.35), transparent 65%),
+            radial-gradient(600px 400px at 50% 100%, rgba(139,92,246,0.35), transparent 60%)
+          `,
+          filter: "blur(40px) saturate(120%)",
+          opacity: 0.7,
+        }}
+      />
+
+      <div className="relative z-10 max-w-md w-full p-8 glass rounded-2xl border border-white/10 shadow-xl">
+        <h1 className="text-2xl font-bold mb-6 text-center text-white">
+          {isSignUp ? "Create your account" : "Welcome back"}
         </h1>
 
-        {/* Tab buttons */}
-        <div className="flex justify-center gap-2 mb-6">
-          <button
-            onClick={() => setIsSignUp(false)}
-            className={`px-6 py-2 rounded-lg font-semibold ${
-              !isSignUp ? "bg-white text-black" : "bg-gray-900 text-white"
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => setIsSignUp(true)}
-            className={`px-6 py-2 rounded-lg font-semibold ${
-              isSignUp ? "bg-white text-black" : "bg-gray-900 text-white"
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleAuth} className="flex flex-col gap-4">
+        <form className="space-y-4">
+          {isSignUp && (
+            <input
+              type="text"
+              placeholder="Full name"
+              className="w-full px-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          )}
           <input
             type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 bg-transparent border border-gray-600 rounded-lg focus:outline-none focus:border-white"
-            required
+            placeholder="Email address"
+            className="w-full px-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
-
           <input
             type="password"
             placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-transparent border border-gray-600 rounded-lg focus:outline-none focus:border-white"
-            required
+            className="w-full px-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
-
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
           <button
             type="submit"
-            className="w-full mt-2 bg-white text-black py-2 rounded-lg font-semibold hover:bg-gray-200 transition"
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-semibold shadow-lg hover:opacity-90 transition"
           >
             {isSignUp ? "Sign Up" : "Sign In"}
           </button>
         </form>
 
-        {/* Footer text */}
-        <p className="text-xs text-gray-500 text-center mt-4">
-          Firebase authentication handled internally.
+        <p className="mt-6 text-center text-sm text-white/70">
+          {isSignUp ? "Already have an account?" : "Don’t have an account?"}{" "}
+          <button
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="underline text-indigo-300 hover:text-indigo-200 transition"
+          >
+            {isSignUp ? "Sign In" : "Sign Up"}
+          </button>
         </p>
       </div>
     </div>

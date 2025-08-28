@@ -55,8 +55,7 @@
 .chat-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
 
 /* ======================================================================= */
-/* Where’s My Stipend — Chat polish                                        */
-/* Hook classes used by ChatWidget (no conflict with Tailwind utilities).  */
+/* Where’s My Stipend — Chat polish + Glassmorphism                        */
 /* ======================================================================= */
 
 .wm-chat {
@@ -66,105 +65,154 @@
   --wm-pink: 236, 72, 153;           /* #EC4899 */
   --wm-bg-dark: 12, 12, 14;          /* near black */
   --wm-card: 246, 247, 248;          /* light card */
-  background: rgba(var(--wm-bg-dark), 1);
+  --wm-ring: 255, 255, 255;
+
+  background: rgba(var(--wm-bg-dark), 0.6);
   border-radius: var(--wm-radius);
   overflow: hidden;
-
-  /* NEW: override global center text from #root */
   text-align: left;
-
-  /* Better font rendering in dark surfaces */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  /* Keep system dark UI affordances sensible */
   color-scheme: dark;
+
+  position: relative; /* for ambient backdrop */
 }
 
-/* Vivid header (solid, readable) */
-.wm-chat .wm-header {
-  background: linear-gradient(105deg,
-    rgb(var(--wm-indigo)) 0%,
-    rgb(var(--wm-purple)) 50%,
-    rgb(var(--wm-pink)) 100%
-  );
+/* ===== Ambient gradient blobs so blur has something to blur ===== */
+.wm-ambient {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(600px 320px at 10% 0%, rgba(99,102,241,0.45), transparent 55%),
+    radial-gradient(520px 280px at 90% 10%, rgba(236,72,153,0.35), transparent 60%),
+    radial-gradient(460px 260px at 40% 100%, rgba(168,85,247,0.35), transparent 62%);
+  filter: blur(28px) saturate(110%);
+  opacity: .55;
+}
+
+/* ========= GLASS LAYER SYSTEM (premium “liquid” look) ========= */
+.glass {
+  position: relative;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow:
+    0 12px 30px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.glass::before {
+  /* gradient ring */
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: 22px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.55), rgba(255,255,255,0.08));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.glass::after {
+  /* soft noise film */
+  content: "";
+  position: absolute; inset: 0; border-radius: 20px; pointer-events: none;
+  opacity: .07; mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='40' height='40' filter='url(%23n)' opacity='.55'/></svg>");
+}
+
+/* vivid header glass (gradient beneath) */
+.wm-header {
+  position: relative;
+  border-bottom: 1px solid rgba(255,255,255,.10);
   color: #fff;
-  border-bottom: 1px solid rgba(255,255,255,.12);
+  background:
+    radial-gradient(900px 350px at -10% -20%, rgba(255,255,255,0.35), transparent 55%),
+    linear-gradient(105deg, rgb(var(--wm-indigo)) 0%, rgb(var(--wm-purple)) 50%, rgb(var(--wm-pink)) 100%);
+}
+.wm-header.glass {
+  background:
+    radial-gradient(900px 350px at -10% -20%, rgba(255,255,255,0.35), transparent 55%),
+    linear-gradient(105deg, rgb(var(--wm-indigo)) 0%, rgb(var(--wm-purple)) 50%, rgb(var(--wm-pink)) 100%);
 }
 
-/* FAQ pills — matte & clickable */
-.wm-chat .wm-faqs { background: rgba(20,21,24,1); }
-.wm-chat .wm-faqs .wm-pill {
-  background: rgba(35,36,40,1);
-  border: 1px solid rgba(255,255,255,.08);
+/* matte FAQ band */
+.wm-faqs { background: rgba(20,21,24,0.75); }
+.wm-pill {
+  background: rgba(35,36,40,0.75);
+  border: 1px solid rgba(255,255,255,.10);
   color: rgba(255,255,255,.95);
   border-radius: 999px;
   transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15);
 }
-.wm-chat .wm-faqs .wm-pill:hover { background: rgba(45,46,52,1); }
-.wm-chat .wm-faqs .wm-pill:active { transform: scale(.98); }
+.wm-pill:hover { background: rgba(45,46,52,.85); }
+.wm-pill:active { transform: scale(.98); }
 
-/* Message feed — solid dark canvas for contrast */
-.wm-chat .wm-feed {
-  background: rgba(var(--wm-bg-dark), 1);
-
-  /* NEW: keep scroll inside the widget, prevent body scroll jumps */
+/* feed canvas */
+.wm-feed {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.35));
   overscroll-behavior: contain;
+  position: relative;
+  z-index: 1; /* above ambient */
 }
 
-/* Bubbles */
-.wm-chat .wm-bubble {
+/* bubbles = glass-light for bot, indigo-glass for user */
+.wm-bubble {
+  position: relative;
   border-radius: 18px;
   line-height: 1.45;
-  box-shadow: 0 6px 18px rgba(0,0,0,.18);
-  border: 1px solid rgba(0,0,0,.06);
-
-  /* NEW: make long URLs / tokens not break layout */
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 10px 28px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.25);
+  word-wrap: break-word; overflow-wrap: anywhere;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
 }
-.wm-chat .wm-bubble.bot {
-  background: rgba(var(--wm-card), 1);
-  color: #0f172a;     /* slate-900 */
-  border-color: rgba(0,0,0,.08);
+.wm-bubble.bot {
+  background: rgba(255,255,255,0.55);
+  color: #0f172a; /* slate-900 */
 }
-.wm-chat .wm-bubble.user {
-  background: rgb(79,70,229); /* indigo-600 */
+.wm-bubble.user {
+  background: linear-gradient(135deg, rgba(99,102,241,0.65), rgba(168,85,247,0.55));
   color: #fff;
-  border-color: rgba(99,102,241,.35);
+  border-color: rgba(168,85,247,.35);
 }
 
-/* Input bar */
-.wm-chat .wm-inputbar {
-  background: rgba(20,21,24,1);
+/* Input group glass */
+.wm-inputbar {
+  background: rgba(10,10,12,0.65);
   border-top: 1px solid rgba(255,255,255,.10);
+  position: relative; z-index: 1;
 }
-.wm-chat .wm-inputbar .wm-input {
-  border-radius: 16px !important;
-  background: #fff !important;
-  color: #0f172a !important;
-  border: 1px solid rgba(0,0,0,.12) !important;
+.wm-inputwrap {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
+}
+.wm-input { color: #fff !important; }
+.wm-input::placeholder { color: rgba(255,255,255,0.55) !important; }
 
-  /* NEW: friendlier placeholder color on dark backgrounds */
-  ::placeholder { color: rgba(15,23,42,.55); }
-}
-.wm-chat .wm-inputbar .wm-send {
-  background: linear-gradient(95deg,
-    rgb(var(--wm-indigo)) 0%,
-    rgb(var(--wm-purple)) 50%,
-    rgb(var(--wm-pink)) 100%
-  ) !important;
+/* circular send button with gradient “liquid” */
+.wm-send {
+  background: linear-gradient(95deg, rgb(var(--wm-indigo)) 0%, rgb(var(--wm-purple)) 50%, rgb(var(--wm-pink)) 100%) !important;
   color: #fff !important;
+  border-radius: 999px !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35) !important;
 }
 
-/* NEW: clear focus-visible ring for keyboard users */
+/* focus ring */
 .wm-chat :is(button, [role="button"], .wm-input):focus-visible {
-  outline: 2px solid rgba(139,92,246,.75);
+  outline: 2px solid rgba(139,92,246,.8);
   outline-offset: 2px;
   border-radius: 14px;
 }
 
-/* NEW: respect reduced-motion preferences */
+/* reduce motion */
 @media (prefers-reduced-motion: reduce) {
   .shimmer { animation: none !important; }
 }

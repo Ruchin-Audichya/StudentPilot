@@ -6,6 +6,7 @@ import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
 import JobCard from "@/components/JobCard";
 import BackendDebug from "@/components/BackendDebug";
+import "../App.css";
 
 interface StudentProfile {
   name: string;
@@ -22,9 +23,14 @@ type DashboardProps = {
 
 export default function Dashboard({ profile }: DashboardProps) {
   const stored = (() => {
-    try { return JSON.parse(localStorage.getItem("onboarding") || "null") as StudentProfile | null; } catch { return null; }
+    try {
+      return JSON.parse(localStorage.getItem("onboarding") || "null") as StudentProfile | null;
+    } catch {
+      return null;
+    }
   })();
   const effective = profile || stored || { name: "Friend", skills: [], interests: [] };
+
   const [skills, setSkills] = useState<string[]>(effective.skills || []);
   const [interests, setInterests] = useState<string[]>(effective.interests || []);
   const [location, setLocation] = useState<string>("India");
@@ -36,7 +42,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [uploaded, setUploaded] = useState(false);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
-  // Backend health polling: try both direct base and rewrite prefix to avoid false 'offline' when rewrites misconfigured
+  // Backend health polling
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
@@ -45,18 +51,15 @@ export default function Dashboard({ profile }: DashboardProps) {
       if (cancelled) return;
       attempts++;
       try {
-        // First try direct base /health
         let success = false;
-        let r: Response | null = null;
         try {
-          r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+          const r = await fetch(`${API_BASE}/health`, { cache: "no-store" });
           success = r.ok;
         } catch {}
-        // If that failed and API_BASE already ends with /api/backend (rewrite style), attempt without that segment
         if (!success && /\/api\/backend$/.test(API_BASE)) {
-          const alt = API_BASE.replace(/\/api\/backend$/, '');
+          const alt = API_BASE.replace(/\/api\/backend$/, "");
           try {
-            const r2 = await fetch(`${alt}/health`, { cache: 'no-store' });
+            const r2 = await fetch(`${alt}/health`, { cache: "no-store" });
             success = r2.ok;
           } catch {}
         }
@@ -64,7 +67,7 @@ export default function Dashboard({ profile }: DashboardProps) {
           setBackendOk(success);
           if (!success && attempts < maxAttempts) setTimeout(check, 2000);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setBackendOk(false);
           if (attempts < maxAttempts) setTimeout(check, 2000);
@@ -72,23 +75,24 @@ export default function Dashboard({ profile }: DashboardProps) {
       }
     }
     check();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function manualRetryBackend() {
     setBackendOk(null);
-    // Trigger a one-off recheck
     (async () => {
       try {
         let ok = false;
         try {
-          const r = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+          const r = await fetch(`${API_BASE}/health`, { cache: "no-store" });
           ok = r.ok;
         } catch {}
         if (!ok && /\/api\/backend$/.test(API_BASE)) {
-          const alt = API_BASE.replace(/\/api\/backend$/, '');
+          const alt = API_BASE.replace(/\/api\/backend$/, "");
           try {
-            const r2 = await fetch(`${alt}/health`, { cache: 'no-store' });
+            const r2 = await fetch(`${alt}/health`, { cache: "no-store" });
             ok = r2.ok;
           } catch {}
         }
@@ -99,21 +103,21 @@ export default function Dashboard({ profile }: DashboardProps) {
     })();
   }
 
-
-  // Chatbot states
+  // Chatbot (legacy left here in case you still use it elsewhere)
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<{ role: string; text: string }[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
 
-  const firstName = useMemo(() => (effective?.name || "").split(" ")[0] || "there", [effective?.name]);
+  const firstName = useMemo(
+    () => (effective?.name || "").split(" ")[0] || "there",
+    [effective?.name]
+  );
 
-  // Lightweight animation variants for result items (non-blocking, short duration)
   const listVariants = {
     hidden: {},
-    show: {
-      transition: { staggerChildren: 0.06, delayChildren: 0.02 },
-    },
+    show: { transition: { staggerChildren: 0.06, delayChildren: 0.02 } },
   } as const;
+
   const itemVariants = {
     hidden: { opacity: 0, y: 12 },
     show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } },
@@ -142,9 +146,9 @@ export default function Dashboard({ profile }: DashboardProps) {
         method: "POST",
         body: formData,
       });
-  const data = await res.json();
-  console.log("Resume upload:", data);
-  if (res.ok) setUploaded(true);
+      const data = await res.json();
+      console.log("Resume upload:", data);
+      if (res.ok) setUploaded(true);
     } catch (err) {
       console.error("Upload failed", err);
     } finally {
@@ -182,19 +186,18 @@ export default function Dashboard({ profile }: DashboardProps) {
   }
 
   function renderFormatted(text: string) {
-    // Basic bullet rendering: lines starting with '-' become list items
     const blocks = text.split(/\n\n+/);
     return (
       <div className="space-y-2">
         {blocks.map((block, i) => {
           const lines = block.split(/\n/);
-          const isList = lines.every(l => l.trim().startsWith("-") || l.trim() === "");
+          const isList = lines.every((l) => l.trim().startsWith("-") || l.trim() === "");
           if (isList) {
             return (
               <ul key={i} className="list-disc pl-5 space-y-1">
-                {lines.filter(l => l.trim().startsWith("-")).map((l, idx) => (
-                  <li key={idx}>{l.replace(/^\s*-\s*/, "")}</li>
-                ))}
+                {lines
+                  .filter((l) => l.trim().startsWith("-"))
+                  .map((l, idx) => <li key={idx}>{l.replace(/^\s*-\s*/, "")}</li>)}
               </ul>
             );
           }
@@ -206,15 +209,30 @@ export default function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="min-h-screen p-6 md:p-8">
-  <div className="mb-4"><BackendDebug /></div>
+      <div className="mb-4">
+        <BackendDebug />
+      </div>
+
       <div className="text-xs mb-2">
-        Backend: {backendOk === null ? 'checking…' : backendOk ? 'online ✅' : (
-          <span className="cursor-pointer underline decoration-dotted" title="Click to retry" onClick={manualRetryBackend}>offline ❌ (retry)</span>
+        Backend:{" "}
+        {backendOk === null ? (
+          "checking…"
+        ) : backendOk ? (
+          "online ✅"
+        ) : (
+          <span
+            className="cursor-pointer underline decoration-dotted"
+            title="Click to retry"
+            onClick={manualRetryBackend}
+          >
+            offline ❌ (retry)
+          </span>
         )}
       </div>
+
       {/* Top bar */}
       <header className="mb-8 flex items-center justify-between">
-        <div>
+        <div className="text-left">
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
             Hi, {firstName} 👋
           </h1>
@@ -222,7 +240,10 @@ export default function Dashboard({ profile }: DashboardProps) {
             Let’s help you land your dream internship.
           </p>
         </div>
-        <a href="/logout" className="px-4 py-2 rounded-full bg-red-500/20 text-red-300 border border-red-400/30 hover:bg-red-500/30 transition">
+        <a
+          href="/logout"
+          className="px-4 py-2 rounded-full bg-red-500/20 text-red-300 border border-red-400/30 hover:bg-red-500/30 transition"
+        >
           Logout
         </a>
       </header>
@@ -234,9 +255,11 @@ export default function Dashboard({ profile }: DashboardProps) {
           {/* Resume uploader */}
           <div className="glass-card rounded-2xl p-5 md:p-6 animate-fade-in">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
+              <div className="text-left">
                 <h2 className="text-lg font-semibold">Upload Resume</h2>
-                <p className="text-sm text-muted-foreground">We’ll use it to refine matches and chat context.</p>
+                <p className="text-sm text-muted-foreground">
+                  We’ll use it to refine matches and chat context.
+                </p>
               </div>
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <input
@@ -248,7 +271,9 @@ export default function Dashboard({ profile }: DashboardProps) {
                 <button
                   onClick={handleResumeUpload}
                   disabled={!resumeFile || uploading}
-                  className={`rounded-full px-5 py-2 text-white shadow-md hover:opacity-95 transition disabled:opacity-50 ${uploaded ? "bg-green-600" : ""} ${!uploaded ? "gradient-primary" : ""}`}
+                  className={`rounded-full px-5 py-2 text-white shadow-md hover:opacity-95 transition disabled:opacity-50 ${
+                    uploaded ? "bg-green-600" : ""
+                  } ${!uploaded ? "gradient-primary" : ""}`}
                 >
                   {uploading ? "Uploading..." : uploaded ? "Uploaded • Replace" : "Upload"}
                 </button>
@@ -273,14 +298,18 @@ export default function Dashboard({ profile }: DashboardProps) {
                 type="text"
                 placeholder="🔍 Search by role or skill… e.g. React, Python"
                 defaultValue={skills.join(", ")}
-                onChange={(e) => setSkills(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                onChange={(e) =>
+                  setSkills(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))
+                }
                 className="bg-input/50 border border-card-border rounded-2xl px-3 py-2 shadow-sm hover:shadow focus:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               <input
                 type="text"
                 placeholder="✨ Interests e.g. AI, Web Dev"
                 defaultValue={interests.join(", ")}
-                onChange={(e) => setInterests(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                onChange={(e) =>
+                  setInterests(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))
+                }
                 className="bg-input/50 border border-card-border rounded-2xl px-3 py-2 shadow-sm hover:shadow focus:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               <input
@@ -291,6 +320,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                 className="bg-input/50 border border-card-border rounded-2xl px-3 py-2 shadow-sm hover:shadow focus:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
+
             {/* chips */}
             <motion.div layout className="mt-3 flex flex-wrap gap-2">
               <AnimatePresence initial={false}>
@@ -330,9 +360,11 @@ export default function Dashboard({ profile }: DashboardProps) {
               <h2 className="text-lg font-semibold">Results</h2>
               <span className="text-sm text-muted-foreground">{results.length} matches</span>
             </div>
+
             {results.length === 0 && !loading && (
               <p className="text-muted-foreground">No results yet. Try a search above.</p>
             )}
+
             {loading && (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -348,6 +380,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                 ))}
               </div>
             )}
+
             <motion.div
               className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
               variants={listVariants}
@@ -375,15 +408,18 @@ export default function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* Right - chat */}
-        <aside className="space-y-6">
-          <ChatWidget profile={{
-            name: effective.name,
-            college: effective.college || "",
-            branch: effective.branch || "",
-            year: effective.year || "",
-            skills,
-            interests,
-          }} />
+        <aside className="space-y-6 lg:sticky lg:top-6 h-fit">
+          {/* ChatWidget already includes its own ambient + glass layers in App.css */}
+          <ChatWidget
+            profile={{
+              name: effective.name,
+              college: effective.college || "",
+              branch: effective.branch || "",
+              year: effective.year || "",
+              skills,
+              interests,
+            }}
+          />
         </aside>
       </div>
     </div>
