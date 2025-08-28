@@ -1,4 +1,5 @@
 // src/services/chatStream.ts
+import { API_BASE } from "@/lib/apiBase";
 
 export async function* streamChat({
   model,
@@ -9,56 +10,29 @@ export async function* streamChat({
   messages: { role: "system" | "user" | "assistant"; content: string }[];
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
-  const url = "https://openrouter.ai/api/v1/chat/completions";
-  // TODO: Replace with secure key handling
-  const apiKey = process.env.OPENROUTER_API_KEY || "";
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
+  // Temporarily disable streaming; use non-stream POST to backend
+  const body = {
+    model: model || "openai/gpt-oss-20b:free",
+    messages: [
+      { role: "system", content: "You are a resume-aware assistant. Keep replies short, bullet-pointed, with light emojis." },
+      ...messages,
+    ],
+    stream: false
   };
-  const body = JSON.stringify({ model, messages, stream: true });
-
-  let lastError: any = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body,
-        signal,
-      });
-      if (response.status === 429 || response.status === 500) {
-        lastError = await response.text();
-        await new Promise((r) => setTimeout(r, 500));
-        continue;
-      }
-      if (!response.ok || !response.body) {
-        throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (line.startsWith("data:")) {
-            try {
-              const json = JSON.parse(line.slice(5));
-              const token = json.choices?.[0]?.delta?.content;
-              if (token) yield token;
-            } catch {}
-          }
-        }
-      }
+  try {
+    const res = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal
+    });
+    if (!res.ok) {
+      yield `⚠️ Chat request failed: ${res.status}`;
       return;
-    } catch (err) {
-      lastError = err;
-      await new Promise((r) => setTimeout(r, 500));
     }
+    const data = await res.json();
+    yield data.response || "No response";
+  } catch (err) {
+    yield `⚠️ Chat request failed: ${err}`;
   }
-  throw new Error(`Failed to stream chat: ${lastError}`);
 }

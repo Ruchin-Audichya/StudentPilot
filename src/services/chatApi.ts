@@ -80,45 +80,6 @@ function sanitize(text: string): string {
 
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
-async function callOpenRouter(model: string, messages: ORMessage[], signal?: AbortSignal): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY || ((globalThis as any).OPENROUTER_API_KEY ?? "");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
-    "X-Title": "Where’s My Stipend – Resume Chat",
-  };
-
-  try {
-    if (typeof window !== "undefined" && window.location?.origin) {
-      headers["HTTP-Referer"] = window.location.origin;
-    }
-  } catch {}
-
-  const body = {
-    model: model || "openai/gpt-oss-20b:free",
-    messages,
-    stream: false,
-    temperature: 0.6,
-    top_p: 0.95,
-    max_tokens: 420,
-  };
-
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    return `❌ OpenRouter error (${res.status}): ${errorText || "No response from backend."}`;
-  }
-  const data = (await res.json()) as ORResponse;
-  const out = data?.choices?.[0]?.message?.content || "";
-  return sanitize(out);
-}
-
 /** Main entry used by the component. Tries your free models in priority order. */
 export async function chatWithAssistant(
   message: string,
@@ -126,31 +87,30 @@ export async function chatWithAssistant(
   history: ChatHistoryItem[] = [],
   opts?: { model?: FreeModel; signal?: AbortSignal }
 ): Promise<string> {
-  const messages: ORMessage[] = [
-    { role: "system", content: "You are a helpful, resume-aware AI. Keep replies short, clear, bullet-pointed, and use light emojis." },
-    ...history.map(m => ({ role: m.isUser ? "user" as "user" : "assistant" as "assistant", content: m.text })),
-    { role: "user", content: message }
-  ];
-  const order: string[] = opts?.model ? [opts.model, ...FREE_MODELS.filter(m => m !== opts.model)] : [...FREE_MODELS];
-
-  let lastErr: unknown = null;
-
-  for (const model of order) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        return await callOpenRouter(model, messages, opts?.signal);
-      } catch (err: any) {
-        lastErr = err;
-        const msg = ("" + (err?.message || err)).toLowerCase();
-        const transient = /429|5\d\d|temporarily|timeout|rate limit|overloaded/.test(msg);
-        if (!transient) break;
-        await delay(300 * (attempt + 1));
-      }
+  const body = {
+    model: opts?.model || "openai/gpt-oss-20b:free",
+    messages: [
+      { role: "system", content: "You are a resume-aware assistant. Keep replies short, bullet-pointed, with light emojis." },
+      ...history.map(m => ({ role: m.isUser ? "user" : "assistant", content: m.text })),
+      { role: "user", content: message }
+    ],
+    stream: false
+  };
+  try {
+    const res = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: opts?.signal
+    });
+    if (!res.ok) {
+      return `⚠️ Chat request failed: ${res.status}`;
     }
+    const data = await res.json();
+    return data.response || "No response";
+  } catch (err) {
+    return `⚠️ Chat request failed: ${err}`;
   }
-
-  console.error("OpenRouter failed through all free models:", lastErr);
-  return "😕 I couldn’t reach the AI right now. Try again in a moment!";
 }
 
 export async function chatCompletion({ message, history, selectedModel }: {
@@ -161,7 +121,7 @@ export async function chatCompletion({ message, history, selectedModel }: {
   const body = {
     model: selectedModel || "openai/gpt-oss-20b:free",
     messages: [
-      { role: "system", content: "You are a resume-aware AI. Keep replies short, bullet-pointed, and use light emojis." },
+      { role: "system", content: "You are a resume-aware assistant. Keep replies short, bullet-pointed, with light emojis." },
       ...history.map(m => ({ role: m.isUser ? "user" : "assistant", content: m.text })),
       { role: "user", content: message }
     ],
