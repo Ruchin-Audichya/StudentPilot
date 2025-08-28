@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { API_BASE } from "@/lib/apiBase";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChatWidget } from "./ChatWidget";
+import ChatWidget from "./ChatWidget";
 import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
 import JobCard from "@/components/JobCard";

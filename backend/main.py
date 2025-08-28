@@ -262,10 +262,15 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) ->
     key, models, base, site_url, site_name = _openrouter_config()
     if not key or not user_message.strip():
         return ""
-    model = models[0] if models else "qwen/qwen3-coder:free"
     system_prompt = (
-        "You are a concise career assistant. Use bullet points. If giving advice, be specific and actionable. "
-        "You are augmenting a heuristic response; avoid repeating obvious info."
+        "You are a career guidance AI for students. Answer in a fun, friendly, and visually clear way. Always use:\n"
+        "- Bullet points and emojis for each section\n"
+        "- Short, punchy sentences\n"
+        "- Clear sections: 🎯 Summary, 🕳️ Skill Gaps, 🔧 Improvements, 👍 Pros, 👎 Cons, ⭐ Rating\n"
+        "- End with a motivational tip or joke (💡 Tip)\n"
+        "Example output:\n"
+        "🎯 Summary: ...\n🕳️ Skill Gaps: ...\n🔧 Improvements: ...\n👍 Pros: ...\n👎 Cons: ...\n⭐ Rating: 8/10\n💡 Tip: ...\n"
+        "Respond in this format, and make it fun and easy to read!"
     )
     profile_snippet = {
         "skills": sorted(list(profile.get("skills", [])))[:25],
@@ -273,38 +278,45 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) ->
         "location": profile.get("location"),
     }
     resume_excerpt = (resume_text or "")[:4000]
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"User message: {user_message}\nProfile: {json.dumps(profile_snippet)}\nResume excerpt: {resume_excerpt}"},
-        ],
-        "temperature": 0.7,
-        "max_tokens": 500,
-    }
-    headers = {
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": site_url,
-        "X-Title": site_name,
-    }
-    try:
-        resp = _requests.post(base, json=payload, headers=headers, timeout=40)
-        resp.raise_for_status()
-        data = resp.json()
-        choices = data.get("choices") or []
-        if choices:
-            content = choices[0].get("message", {}).get("content")
-            if content:
-                return content.strip()
-        return json.dumps(data)[:800]
-    except Exception as e:
-        if os.getenv("AI_DEBUG", "0") in {"1","true","yes"}:
-            import traceback, logging
-            logging.basicConfig(level=logging.INFO)
-            logging.error("OpenRouter call failed: %s", e)
-            logging.error("Trace: %s", traceback.format_exc())
-        return ""
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"User message: {user_message}\nProfile: {json.dumps(profile_snippet)}\nResume excerpt: {resume_excerpt}"},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 500,
+        }
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": site_url,
+            "X-Title": site_name,
+        }
+        try:
+            resp = _requests.post(base, json=payload, headers=headers, timeout=40)
+            resp.raise_for_status()
+            data = resp.json()
+            choices = data.get("choices") or []
+            if choices:
+                content = choices[0].get("message", {}).get("content")
+                if content:
+                    import re
+                    # Ensure line breaks and emojis are preserved
+                    content = re.sub(r'([\n\r]+)', '\n', content)
+                    content = re.sub(r'\n{2,}', '\n', content)
+                    # Add extra spacing after emoji sections
+                    content = re.sub(r'(\n[🎯🕳️🔧👍👎⭐💡])', '\n\1', content)
+                    return content.strip()
+        except Exception as e:
+            if os.getenv("AI_DEBUG", "0") in {"1","true","yes"}:
+                import traceback, logging
+                logging.basicConfig(level=logging.INFO)
+                logging.error(f"OpenRouter call failed for model {model}: %s", e)
+                logging.error("Trace: %s", traceback.format_exc())
+            continue
+    return ""
 
 @app.get("/api/ai-test")
 def ai_test():

@@ -23,19 +23,22 @@ interface ChatWidgetProps {
   };
 }
 
-const ChatWidget = ({ profile }: ChatWidgetProps) => {
+export default function ChatWidget({ profile }: ChatWidgetProps) {
   const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: crypto.randomUUID(),
-      text: `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI resume & internship assistant.\n\nUpload your resume (left) and ask me anything—I'll tailor answers to your profile, suggest roles, and help polish your resume.`,
+      text:
+        `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI resume & internship assistant.\n\n` +
+        `Upload your resume (left) and ask me anything—I'll tailor answers to your profile, suggest roles, and help polish your resume.`,
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
+  // Exactly 3 resume-centric FAQs
   const faqs = useMemo(
     () => [
       "Rate my resume & top 3 fixes",
@@ -46,7 +49,7 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
   );
 
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = scrollerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
@@ -69,7 +72,7 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
         { id: crypto.randomUUID(), text: reply, isUser: false, timestamp: new Date() },
       ]);
     } catch (err) {
-      console.error(err);
+      console.error("AI error:", err);
       setMessages((prev) => [
         ...prev,
         {
@@ -106,115 +109,59 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
   return (
     <div
       className="
-        w-full
-        rounded-3xl
-        border border-card-border
-        overflow-hidden
-        shadow-[0_10px_30px_-10px_rgba(0,0,0,0.45)]
-        backdrop-blur-xl
-        max-h-[78vh] md:max-h-[82vh]
-        flex flex-col
-        bg-black/20
+        wm-chat
+        w-full max-h-[78vh] md:max-h-[82vh]
+        rounded-[24px] border border-card-border shadow-xl
+        overflow-hidden flex flex-col bg-neutral-950
       "
     >
-      {/* Header with stacked gradients */}
-      <div className="relative">
-        {/* Base vivid linear gradient */}
-        <div
-          className="
-            relative z-10
-            px-4 md:px-5 py-4
-            text-white
-            bg-[linear-gradient(95deg,#635BFF_0%,#8B5CF6_45%,#EC4899_100%)]
-            rounded-t-3xl
-            border-b border-white/15
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-sm">
-                <MessageCircle className="w-5 h-5" />
-              </div>
-              <div className="leading-tight">
-                <div className="font-extrabold tracking-tight">Resume Chat</div>
-                <div className="text-[11px] opacity-95">
-                  AI Assistant for {profile?.name?.split(" ")[0] || "you"}
-                </div>
+      {/* HEADER (gradient + rounded top) */}
+      <div
+        className="
+          wm-header
+          px-4 md:px-5 py-4 text-white rounded-t-[24px]
+          bg-[linear-gradient(105deg,#6D6AFF_0%,#8B5CF6_48%,#EC4899_100%)]
+          border-b border-white/10
+        "
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-white/15 border border-white/25">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <div className="leading-tight">
+              <div className="font-extrabold tracking-tight">Resume Chat</div>
+              <div className="text-[11px] opacity-95">
+                AI Assistant for {profile?.name?.split(" ")[0] || "you"}
               </div>
             </div>
-
-            <span
-              className="
-                hidden sm:inline-flex items-center text-[10px] px-2 py-1 rounded-full
-                bg-white/15 border border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,.5)]
-              "
-            >
-              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-              Resume-aware
-            </span>
           </div>
-
-          {/* Tip shown when only seed exists */}
-          {messages.length <= 1 && (
-            <div className="mt-3 flex items-center gap-2 text-[12px] text-white/95">
-              <FileText className="w-4 h-4" />
-              Upload your resume on the left to unlock tailored answers.
-            </div>
-          )}
+          <span className="hidden sm:inline-flex items-center text-[10px] px-2 py-1 rounded-full bg-white/15 border border-white/25">
+            <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Resume-aware
+          </span>
         </div>
 
-        {/* Radial spotlight (top-left) */}
-        <span
-          aria-hidden
-          className="
-            pointer-events-none absolute inset-0
-            bg-[radial-gradient(1200px_500px_at_-5%_-20%,rgba(255,255,255,0.35),transparent_60%)]
-            rounded-t-3xl
-          "
-        />
-        {/* Grain / noise film */}
-        <span
-          aria-hidden
-          className="
-            pointer-events-none absolute inset-0 opacity-[0.08] mix-blend-soft-light rounded-t-3xl
-            bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22 viewBox=%220 0 40 40%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%222%22 stitchTiles=%22stitch%22/></filter><rect width=%2240%22 height=%2240%22 filter=%22url(%23n)%22 opacity=%220.4%22/></svg>')]
-          "
-        />
-        {/* Inner highlight */}
-        <span
-          aria-hidden
-          className="
-            pointer-events-none absolute inset-0 rounded-t-3xl
-            shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]
-          "
-        />
-        {/* Outer ring to separate from dark bg */}
-        <span
-          aria-hidden
-          className="
-            pointer-events-none absolute -inset-[1px] rounded-t-[28px]
-            bg-[linear-gradient(180deg,rgba(255,255,255,0.5),rgba(255,255,255,0))]
-            opacity-40
-          "
-        />
+        {messages.length <= 1 && (
+          <div className="mt-3 flex items-center gap-2 text-[12px] text-white/95">
+            <FileText className="w-4 h-4" />
+            Upload your resume on the left to unlock tailored answers.
+          </div>
+        )}
       </div>
 
-      {/* FAQ Pills */}
-      <div className="px-3 sm:px-4 py-2 sm:py-3">
+      {/* FAQ PILLS (rounded) */}
+      <div className="wm-faqs px-3 sm:px-4 py-2 sm:py-3 bg-neutral-900">
         <div className="flex flex-wrap gap-2">
           {faqs.map((q) => (
             <button
               key={q}
               onClick={() => handleQuickAsk(q)}
               className="
-                text-xs sm:text-[13px]
-                px-3 py-1.5 rounded-full
-                bg-black/20 hover:bg-black/30
-                border border-white/10
-                shadow-[inset_0_1px_0_rgba(255,255,255,.25)]
-                backdrop-blur
-                transition active:scale-[.98]
-                text-white/95
+                wm-pill
+                text-xs sm:text-[13px] px-3 py-1.5
+                rounded-full bg-neutral-800 hover:bg-neutral-700
+                border border-white/10 text-white/95 transition active:scale-[.98]
+                shadow-[inset_0_1px_0_rgba(255,255,255,.08)]
               "
             >
               <Sparkles className="inline-block w-3.5 h-3.5 mr-1 -mt-0.5" />
@@ -224,38 +171,34 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
         </div>
       </div>
 
-      {/* Messages area */}
+      {/* FEED (rounded bubbles) */}
       <div
-        ref={scrollRef}
+        ref={scrollerRef}
         className="
-          flex-1
-          px-3 sm:px-4 py-3 sm:py-4
-          overflow-y-auto
-          bg-gradient-to-b from-white/5 to-transparent
-          space-y-2
+          wm-feed chat-scrollbar flex-1 overflow-y-auto
+          px-3 sm:px-4 py-3 sm:py-4 space-y-3 bg-neutral-950
         "
       >
         {messages.map((m) => (
           <motion.div
             key={m.id}
-            initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             className={[
-              "max-w-[86%] rounded-2xl px-3.5 py-2.5 leading-relaxed",
-              "backdrop-blur-md border shadow-sm whitespace-pre-line",
+              "wm-bubble max-w-[92%] px-4 py-3 leading-relaxed rounded-2xl border",
               m.isUser
-                ? "ml-auto bg-gradient-to-br from-indigo-500/25 to-purple-500/25 border-indigo-400/30 text-indigo-950 dark:text-indigo-50"
-                : "bg-white/35 border-white/50 text-slate-900 dark:text-slate-100",
+                ? "user ml-auto bg-indigo-600 text-white border-indigo-400/30 shadow"
+                : "bot bg-neutral-100 text-neutral-900 border-neutral-200 shadow",
             ].join(" ")}
           >
-            {m.text}
+            <span className="whitespace-pre-line">{m.text}</span>
           </motion.div>
         ))}
 
         {isLoading && (
-          <div className="max-w-[70%] rounded-2xl px-3.5 py-2.5 bg-white/35 border border-white/50 backdrop-blur-md shadow-sm text-slate-900 dark:text-slate-100">
-            <div className="flex items-center gap-1 text-muted-foreground">
+          <div className="wm-bubble bot max-w-[70%] px-4 py-3 rounded-2xl bg-neutral-100 border border-neutral-200 text-neutral-900">
+            <div className="flex items-center gap-1 opacity-70">
               <span className="w-2 h-2 rounded-full bg-current animate-bounce" />
               <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.1s]" />
               <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.2s]" />
@@ -264,9 +207,15 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
         )}
       </div>
 
-      {/* Input (sticky) */}
-      <div className="sticky bottom-0 p-3 sm:p-4 bg-white/70 dark:bg-white/10 backdrop-blur-2xl border-t border-white/10">
-        <div className="flex items-center gap-2">
+      {/* INPUT GROUP (rounded pill + round send) */}
+      <div className="wm-inputbar sticky bottom-0 px-3 sm:px-4 py-3 sm:py-4 bg-neutral-900 border-t border-white/10">
+        <div
+          className="
+            flex items-center gap-2
+            rounded-full bg-black/20 border border-white/10
+            px-3 py-2
+          "
+        >
           <Input
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -274,8 +223,9 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
             placeholder="Ask about resume fixes, roles, or skill gaps…"
             disabled={isLoading}
             className="
-              bg-white/85 dark:bg-white/10 focus:bg-white dark:focus:bg-white/15
-              rounded-2xl border-white/20 text-sm
+              wm-input
+              flex-1 bg-transparent border-0 shadow-none focus-visible:ring-0
+              text-sm text-white placeholder:text-white/50
             "
             aria-label="Message input"
           />
@@ -283,12 +233,14 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
             onClick={handleSend}
             disabled={isLoading || !inputText.trim()}
             className="
-              rounded-2xl px-4
+              wm-send
+              rounded-full w-11 h-11 p-0
               text-white
-              shadow-md hover:shadow-lg active:scale-[.98]
               bg-[linear-gradient(95deg,#6D6AFF_0%,#8B5CF6_50%,#EC4899_100%)]
+              shadow-md hover:shadow-lg active:scale-[.98]
             "
             aria-label="Send message"
+            title="Send"
           >
             <Send className="w-4 h-4" />
           </Button>
@@ -299,7 +251,4 @@ const ChatWidget = ({ profile }: ChatWidgetProps) => {
       </div>
     </div>
   );
-};
-
-export { ChatWidget };
-export default ChatWidget;
+}

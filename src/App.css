@@ -29,12 +29,8 @@
 }
 
 @keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -43,10 +39,132 @@
   }
 }
 
-.card {
-  padding: 2em;
+.card { padding: 2em; }
+
+.read-the-docs { color: #888; }
+
+/* Chat scrollbars (dark) */
+.chat-scrollbar::-webkit-scrollbar { height: 10px; width: 10px; }
+.chat-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.chat-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
+
+/* ======================================================================= */
+/* Where’s My Stipend — Chat polish                                        */
+/* Hook classes used by ChatWidget (no conflict with Tailwind utilities).  */
+/* ======================================================================= */
+
+.wm-chat {
+  --wm-radius: 24px;
+  --wm-indigo: 62, 82, 255;          /* #3E52FF */
+  --wm-purple: 139, 92, 246;         /* #8B5CF6 */
+  --wm-pink: 236, 72, 153;           /* #EC4899 */
+  --wm-bg-dark: 12, 12, 14;          /* near black */
+  --wm-card: 246, 247, 248;          /* light card */
+  background: rgba(var(--wm-bg-dark), 1);
+  border-radius: var(--wm-radius);
+  overflow: hidden;
+
+  /* NEW: override global center text from #root */
+  text-align: left;
+
+  /* Better font rendering in dark surfaces */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Keep system dark UI affordances sensible */
+  color-scheme: dark;
 }
 
-.read-the-docs {
-  color: #888;
+/* Vivid header (solid, readable) */
+.wm-chat .wm-header {
+  background: linear-gradient(105deg,
+    rgb(var(--wm-indigo)) 0%,
+    rgb(var(--wm-purple)) 50%,
+    rgb(var(--wm-pink)) 100%
+  );
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+/* FAQ pills — matte & clickable */
+.wm-chat .wm-faqs { background: rgba(20,21,24,1); }
+.wm-chat .wm-faqs .wm-pill {
+  background: rgba(35,36,40,1);
+  border: 1px solid rgba(255,255,255,.08);
+  color: rgba(255,255,255,.95);
+  border-radius: 999px;
+  transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.wm-chat .wm-faqs .wm-pill:hover { background: rgba(45,46,52,1); }
+.wm-chat .wm-faqs .wm-pill:active { transform: scale(.98); }
+
+/* Message feed — solid dark canvas for contrast */
+.wm-chat .wm-feed {
+  background: rgba(var(--wm-bg-dark), 1);
+
+  /* NEW: keep scroll inside the widget, prevent body scroll jumps */
+  overscroll-behavior: contain;
+}
+
+/* Bubbles */
+.wm-chat .wm-bubble {
+  border-radius: 18px;
+  line-height: 1.45;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  border: 1px solid rgba(0,0,0,.06);
+
+  /* NEW: make long URLs / tokens not break layout */
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.wm-chat .wm-bubble.bot {
+  background: rgba(var(--wm-card), 1);
+  color: #0f172a;     /* slate-900 */
+  border-color: rgba(0,0,0,.08);
+}
+.wm-chat .wm-bubble.user {
+  background: rgb(79,70,229); /* indigo-600 */
+  color: #fff;
+  border-color: rgba(99,102,241,.35);
+}
+
+/* Input bar */
+.wm-chat .wm-inputbar {
+  background: rgba(20,21,24,1);
+  border-top: 1px solid rgba(255,255,255,.10);
+}
+.wm-chat .wm-inputbar .wm-input {
+  border-radius: 16px !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+
+  /* NEW: friendlier placeholder color on dark backgrounds */
+  ::placeholder { color: rgba(15,23,42,.55); }
+}
+.wm-chat .wm-inputbar .wm-send {
+  background: linear-gradient(95deg,
+    rgb(var(--wm-indigo)) 0%,
+    rgb(var(--wm-purple)) 50%,
+    rgb(var(--wm-pink)) 100%
+  ) !important;
+  color: #fff !important;
+}
+
+/* NEW: clear focus-visible ring for keyboard users */
+.wm-chat :is(button, [role="button"], .wm-input):focus-visible {
+  outline: 2px solid rgba(139,92,246,.75);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
+/* NEW: respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer { animation: none !important; }
 }
