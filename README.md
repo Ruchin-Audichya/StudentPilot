@@ -24,7 +24,7 @@ Frontend: React + Vite + TypeScript + Tailwind + shadcn/ui + React Query
 Backend: FastAPI, Requests, BeautifulSoup, optional Selenium (feature‑flag)  
 Parsing: python-docx, PyMuPDF (optional)  
 AI: OpenRouter (model list via `OPENROUTER_MODELS`)  
-Deployment: Vercel (frontend) + AWS Elastic Beanstalk or Render (backend)  
+Deployment: Vercel (frontend) + Render (backend)
 Auth/Data: Firebase (anonymous) – optional; app still works without it.
 
 ## Quick Start (Local)
@@ -41,7 +41,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 Frontend (new terminal):
 ```powershell
 npm install
-$env:VITE_API_BASE='http://127.0.0.1:8000'
+$env:VITE_API_BASE='http://127.0.0.1:8000' # For local dev only
 npm run dev
 ```
 Visit: http://localhost:5173
@@ -49,7 +49,7 @@ Visit: http://localhost:5173
 Upload a resume → see extracted skills (hit `/api/resume-status`) → search internships → chat.
 
 ## Environment Variables
-Backend (set in EB / Render dashboard):
+Backend (set in Render dashboard):
 | Name | Purpose | Example |
 |------|---------|---------|
 | OPENROUTER_API_KEY | Enables AI chat augmentation | sk-or-... |
@@ -101,11 +101,10 @@ Render reads `render.yaml` (already in repo) so you can accept most defaults:
 5. Start Command (if not auto-filled):
 	`gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --workers 3 --timeout 120`
 6. Env Vars (add now): `OPENROUTER_API_KEY` (secret), `CORS_ORIGINS`, `FRONTEND_ORIGIN`, `DISABLE_LINKEDIN=1`.
-7. Deploy → confirm health: visit `https://<service>.onrender.com/health` expecting `{"status": "ok"}`.
+7. Deploy → confirm health: visit `https://studentpilot.onrender.com/health` expecting `{"status": "ok"}`.
 
 Frontend (Vercel):
 1. Set (optionally) `VITE_API_BASE` to your backend origin or leave blank to use development defaults.
-2. If using a proxy route, adjust rewrites in `vercel.json` accordingly.
 
 ## Firebase Integration
 - Anonymous user ensured on onboarding.
@@ -151,7 +150,7 @@ Invoke-RestMethod -Method POST -Uri http://127.0.0.1:8000/api/chat -Body (@{mess
 
 ## Architecture Snapshot
 ```
-frontend (Vercel) --> /api/backend/* rewrite --> backend (FastAPI on EB/Render)
+frontend (Vercel) --> backend (FastAPI on Render)
 										 |--> /health
 										 |--> /api/search (scrapers + scoring)
 										 |--> /api/upload-resume (parse + profile)

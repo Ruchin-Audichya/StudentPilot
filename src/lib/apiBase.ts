@@ -20,8 +20,8 @@ function computeApiBase(): string {
   } catch {/* ignore */}
   if (isVercel) {
     // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
-    if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
-      return 'https://wheres-my-stipend-wms.onrender.com';
+      if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
+        return 'https://studentpilot.onrender.com';
     }
     return cleaned.replace(/\/$/, '');
   }
