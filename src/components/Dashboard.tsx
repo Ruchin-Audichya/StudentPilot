@@ -419,6 +419,7 @@ export default function Dashboard({ profile }: DashboardProps) {
               skills,
               interests,
             }}
+            resumeUploaded={uploaded}
           />
         </aside>
       </div>

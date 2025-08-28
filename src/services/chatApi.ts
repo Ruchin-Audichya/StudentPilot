@@ -1,6 +1,8 @@
 // services/chatApi.ts
 // OpenRouter chat client wired to your free models, resume-aware, concise, emoji formatting.
 
+import { API_BASE } from "@/lib/apiBase";
+
 export type ChatHistoryItem = { text: string; isUser: boolean };
 export type ChatProfile = {
   name: string;
@@ -79,13 +81,10 @@ function sanitize(text: string): string {
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function callOpenRouter(model: string, messages: ORMessage[], signal?: AbortSignal): Promise<string> {
-  const apiKey =
-    (typeof process !== "undefined" && (process.env as any)?.OPENROUTER_API_KEY) ||
-    (globalThis as any).OPENROUTER_API_KEY;
-
+  const apiKey = process.env.OPENROUTER_API_KEY || ((globalThis as any).OPENROUTER_API_KEY ?? "");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey || ""}`,
+    Authorization: `Bearer ${apiKey}`,
     "X-Title": "Where’s My Stipend – Resume Chat",
   };
 
@@ -96,8 +95,9 @@ async function callOpenRouter(model: string, messages: ORMessage[], signal?: Abo
   } catch {}
 
   const body = {
-    model,
+    model: model || "openai/gpt-oss-20b:free",
     messages,
+    stream: false,
     temperature: 0.6,
     top_p: 0.95,
     max_tokens: 420,
@@ -111,9 +111,9 @@ async function callOpenRouter(model: string, messages: ORMessage[], signal?: Abo
   });
 
   if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+    const errorText = await res.text();
+    return `❌ OpenRouter error (${res.status}): ${errorText || "No response from backend."}`;
   }
-
   const data = (await res.json()) as ORResponse;
   const out = data?.choices?.[0]?.message?.content || "";
   return sanitize(out);
@@ -126,7 +126,11 @@ export async function chatWithAssistant(
   history: ChatHistoryItem[] = [],
   opts?: { model?: FreeModel; signal?: AbortSignal }
 ): Promise<string> {
-  const messages = buildMessages(message, profile, history);
+  const messages: ORMessage[] = [
+    { role: "system", content: "You are a helpful, resume-aware AI. Keep replies short, clear, bullet-pointed, and use light emojis." },
+    ...history.map(m => ({ role: m.isUser ? "user" as "user" : "assistant" as "assistant", content: m.text })),
+    { role: "user", content: message }
+  ];
   const order: string[] = opts?.model ? [opts.model, ...FREE_MODELS.filter(m => m !== opts.model)] : [...FREE_MODELS];
 
   let lastErr: unknown = null;
@@ -147,6 +151,35 @@ export async function chatWithAssistant(
 
   console.error("OpenRouter failed through all free models:", lastErr);
   return "😕 I couldn’t reach the AI right now. Try again in a moment!";
+}
+
+export async function chatCompletion({ message, history, selectedModel }: {
+  message: string;
+  history: { isUser: boolean; text: string }[];
+  selectedModel?: string;
+}) {
+  const body = {
+    model: selectedModel || "openai/gpt-oss-20b:free",
+    messages: [
+      { role: "system", content: "You are a resume-aware AI. Keep replies short, bullet-pointed, and use light emojis." },
+      ...history.map(m => ({ role: m.isUser ? "user" : "assistant", content: m.text })),
+      { role: "user", content: message }
+    ],
+    stream: false
+  };
+  try {
+    const res = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      return { error: `⚠️ Chat request failed: ${res.status}` };
+    }
+    return await res.json();
+  } catch (err) {
+    return { error: `⚠️ Chat request failed: ${err}` };
+  }
 }
 
 export type { ChatHistoryItem as HistoryItem, ChatProfile as Profile };

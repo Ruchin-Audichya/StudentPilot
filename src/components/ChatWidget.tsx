@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { MessageCircle, Send, Sparkles, ShieldCheck, FileText } from "lucide-react";
+import {
+  MessageCircle,
+  Send,
+  Sparkles,
+  ShieldCheck,
+  FileText,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { streamChat } from "@/services/chatStream";
@@ -8,9 +14,8 @@ import MarkdownMessage from "./MarkdownMessage";
 import FAQPills from "./chat/FAQPills";
 import Message from "./chat/Message";
 import ChatInput from "./chat/ChatInput";
-import ResumeBadge from "./chat/ResumeBadge";
-import ProfileChips from "./chat/ProfileChips";
 import { FREE_MODELS } from "@/constants/models";
+import ResumeBadge from "./chat/ResumeBadge";
 
 interface Message {
   id: string;
@@ -28,9 +33,13 @@ interface ChatWidgetProps {
     skills: string[];
     interests: string[];
   };
+  resumeUploaded: boolean;
 }
 
-export default function ChatWidget({ profile }: ChatWidgetProps) {
+export default function ChatWidget({
+  profile,
+  resumeUploaded,
+}: ChatWidgetProps) {
   const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: crypto.randomUUID(),
@@ -73,8 +82,8 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
     try {
       const userAndHistory = [
         ...messages.map((m) => ({
-          role: m.isUser ? "user" as "user" : "assistant" as "assistant",
-          content: m.text
+          role: m.isUser ? ("user" as "user") : ("assistant" as "assistant"),
+          content: m.text,
         })),
         { role: "user" as "user", content: text },
       ];
@@ -95,7 +104,10 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, text: "❌ I’m having trouble right now—please try again in a moment." }
+            ? {
+                ...m,
+                text: "❌ I’m having trouble right now—please try again in a moment.",
+              }
             : m
         )
       );
@@ -150,7 +162,10 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
       <div className="wm-ambient" aria-hidden />
 
       {/* HEADER — premium glass */}
-      <div className="wm-header glass px-4 md:px-5 py-4 text-white rounded-t-[24px]" style={{ zIndex: 1 }}>
+      <div
+        className="wm-header glass px-4 md:px-5 py-4 text-white rounded-t-[24px]"
+        style={{ zIndex: 1 }}
+      >
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-white/15 border border-white/25">
@@ -158,19 +173,19 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
             </div>
             <div className="leading-tight">
               <div className="font-extrabold tracking-tight">Resume Chat</div>
-              <div className="text-[11px] opacity-95">AI Assistant for {nameFirst}</div>
+              <div className="text-[11px] opacity-95">
+                AI Assistant for {nameFirst}
+              </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2 md:gap-3 md:flex-row md:items-center">
-            <ResumeBadge uploaded={true} />
-            <ProfileChips skills={profile.skills} year={profile.year} />
+          <div className="ml-auto flex items-center gap-2">
             <select
               value={selectedModel}
-              onChange={e => setSelectedModel(e.target.value)}
+              onChange={(e) => setSelectedModel(e.target.value)}
               className="rounded-full px-3 py-1 bg-white/10 border border-white/20 text-white/80 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
               style={{ minWidth: 160 }}
             >
-              {FREE_MODELS.map(m => (
+              {FREE_MODELS.map((m) => (
                 <option key={m.id} value={m.id} className="bg-black text-white">
                   {m.label}
                 </option>
@@ -188,7 +203,10 @@ export default function ChatWidget({ profile }: ChatWidgetProps) {
       </div>
 
       {/* FAQ pills (matte) */}
-      <div className="wm-faqs px-3 sm:px-4 py-2 sm:py-3" style={{ zIndex: 1 }}>
+      <div
+        className="wm-faqs px-3 sm:px-4 py-2 sm:py-3"
+        style={{ zIndex: 1 }}
+      >
         <FAQPills items={faqs} onPick={handleQuickAsk} />
       </div>
 
