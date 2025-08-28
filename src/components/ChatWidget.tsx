@@ -66,6 +66,23 @@ export default function ChatWidget({
   );
 
   useEffect(() => {
+    // Show welcome message only once per browser
+    if (!localStorage.getItem("wm.welcomeShown.v1")) {
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          text:
+            `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI resume & internship assistant.\n\n` +
+            `Upload your resume (left) and ask me anything—I'll tailor answers to your profile, suggest roles, and help polish your resume.`,
+          isUser: false,
+          timestamp: new Date(),
+        },
+      ]);
+      localStorage.setItem("wm.welcomeShown.v1", "1");
+    }
+  }, [profile?.name]);
+
+  useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
@@ -80,10 +97,9 @@ export default function ChatWidget({
       { id: assistantId, text: "", isUser: false, timestamp: new Date() },
     ]);
     try {
-      // Only pass message and model, not messages array
       const stream = streamChat({
         message: text,
-        model: selectedModel,
+        model: selectedModel.trim(),
         signal: abortController.current.signal,
       });
       for await (const token of stream) {
@@ -145,12 +161,7 @@ export default function ChatWidget({
 
   return (
     <div
-      className="
-        wm-chat
-        w-full max-h-[78vh] md:max-h-[82vh]
-        rounded-[24px] border border-white/10 shadow-2xl
-        overflow-hidden flex flex-col
-      "
+      className="wm-chat w-full max-h-[78vh] md:max-h-[86vh] md:text-[15px] leading-relaxed rounded-[24px] border border-white/10 shadow-2xl overflow-hidden flex flex-col"
     >
       {/* Ambient backdrop for blur (behind all glass) */}
       <div className="wm-ambient" aria-hidden />
@@ -216,11 +227,13 @@ export default function ChatWidget({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
-            <Message text={m.text} isUser={m.isUser} />
+            <div className={m.isUser ? "wm-bubble user text-[14px] md:text-[15px]" : "wm-bubble bot text-[14px] md:text-[15px]"}>
+              <MarkdownMessage text={m.text} />
+            </div>
           </motion.div>
         ))}
         {isLoading && (
-          <div className="wm-bubble bot max-w-[70%] px-4 py-3">
+          <div className="wm-bubble bot max-w-[70%] px-4 py-3 text-[14px] md:text-[15px]">
             <div className="flex items-center gap-1 opacity-70">
               <span className="w-2 h-2 rounded-full bg-current animate-bounce" />
               <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.1s]" />

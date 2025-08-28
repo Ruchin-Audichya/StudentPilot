@@ -2,6 +2,7 @@
 // OpenRouter chat client wired to your free models, resume-aware, concise, emoji formatting.
 
 import { API_BASE } from "@/lib/apiBase";
+import { sanitizeAndShapeReply } from "@/utils/chatFormat";
 
 export type ChatHistoryItem = { text: string; isUser: boolean };
 export type ChatProfile = {
@@ -16,8 +17,6 @@ export type ChatProfile = {
 type ORMessage = { role: "system" | "user" | "assistant"; content: string };
 type ORChoice = { message: { role: "assistant"; content: string } };
 type ORResponse = { id: string; choices: ORChoice[] };
-
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /** Your free-model priority list */
 const FREE_MODELS = [
@@ -88,7 +87,7 @@ export async function chatWithAssistant(
 ): Promise<string> {
   const body = {
     message,
-    model: selectedModel || "openai/gpt-oss-20b:free"
+    model: (selectedModel || "openai/gpt-oss-20b:free").trim()
   };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts?.idToken) headers["id_token"] = opts.idToken;
@@ -99,10 +98,10 @@ export async function chatWithAssistant(
       body: JSON.stringify(body),
       signal: opts?.signal
     });
+    if (!res.ok) throw new Error(`⚠️ Chat request failed: ${res.status} ${res.statusText}`);
     const data = await res.json();
-    if (data.response) return data.response;
-    if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-    return "No response";
+    let reply = data.response || data.choices?.[0]?.message?.content || "No response";
+    return sanitizeAndShapeReply(reply);
   } catch (err) {
     return `⚠️ Chat request failed: ${err}`;
   }
@@ -115,7 +114,7 @@ export async function chatCompletion({ message, selectedModel, idToken }: {
 }) {
   const body = {
     message,
-    model: selectedModel || "openai/gpt-oss-20b:free"
+    model: (selectedModel || "openai/gpt-oss-20b:free").trim()
   };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (idToken) headers["id_token"] = idToken;
@@ -125,10 +124,10 @@ export async function chatCompletion({ message, selectedModel, idToken }: {
       headers,
       body: JSON.stringify(body)
     });
+    if (!res.ok) throw new Error(`⚠️ Chat request failed: ${res.status} ${res.statusText}`);
     const data = await res.json();
-    if (data.response) return data.response;
-    if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-    return "No response";
+    let reply = data.response || data.choices?.[0]?.message?.content || "No response";
+    return sanitizeAndShapeReply(reply);
   } catch (err) {
     return `⚠️ Chat request failed: ${err}`;
   }

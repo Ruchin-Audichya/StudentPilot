@@ -1,5 +1,6 @@
 // src/services/chatStream.ts
 import { API_BASE } from "@/lib/apiBase";
+import { sanitizeAndShapeReply } from "@/utils/chatFormat";
 
 export async function* streamChat({
   message,
@@ -10,10 +11,9 @@ export async function* streamChat({
   model: string;
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
-  // Temporarily disable streaming; use non-stream POST to backend
   const body = {
     message,
-    model: model || "openai/gpt-oss-20b:free"
+    model: (model || "openai/gpt-oss-20b:free").trim()
   };
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
@@ -22,14 +22,13 @@ export async function* streamChat({
       body: JSON.stringify(body),
       signal
     });
-    const data = await res.json();
-    if (data.response) {
-      yield data.response;
-    } else if (data.choices?.[0]?.message?.content) {
-      yield data.choices[0].message.content;
-    } else {
-      yield "No response";
+    if (!res.ok) {
+      yield `⚠️ Chat request failed: ${res.status}`;
+      return;
     }
+    const data = await res.json();
+    let reply = data.response || data.choices?.[0]?.message?.content || "No response";
+    yield sanitizeAndShapeReply(reply);
   } catch (err) {
     yield `⚠️ Chat request failed: ${err}`;
   }
