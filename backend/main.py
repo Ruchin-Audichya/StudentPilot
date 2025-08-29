@@ -45,7 +45,11 @@ def _maybe_import_linkedin():
 def _openrouter_config():
     """Fetch OpenRouter-related env vars dynamically so key changes don't require process restart."""
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    models = [m.strip() for m in os.getenv("OPENROUTER_MODELS", "qwen/qwen3-coder:free").split(",") if m.strip()]
+    raw_models = [m.strip() for m in os.getenv("OPENROUTER_MODELS", "qwen/qwen3-coder:free").split(",") if m.strip()]
+    allowed = {"openai/gpt-oss-20b:free", "qwen/qwen3-coder:free", "tngtech/deepseek-r1t2-chimera:free"}
+    models = [m for m in raw_models if m in allowed]
+    if not models:
+        models = ["openai/gpt-oss-20b:free"]
     base = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions").strip()
     site_url = os.getenv("OPENROUTER_SITE_URL", "https://example.com").strip() or "https://example.com"
     site_name = os.getenv("OPENROUTER_SITE_NAME", "Career Copilot").strip() or "Career Copilot"

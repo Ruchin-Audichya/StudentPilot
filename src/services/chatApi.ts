@@ -3,6 +3,7 @@
 
 import { API_BASE } from "@/lib/apiBase";
 import { sanitizeAndShapeReply } from "@/utils/chatFormat";
+import { FREE_MODELS } from "@/constants/models";
 
 export type ChatHistoryItem = { text: string; isUser: boolean };
 export type ChatProfile = {
@@ -18,13 +19,7 @@ type ORMessage = { role: "system" | "user" | "assistant"; content: string };
 type ORChoice = { message: { role: "assistant"; content: string } };
 type ORResponse = { id: string; choices: ORChoice[] };
 
-/** Your free-model priority list */
-const FREE_MODELS = [
-  "openai/gpt-oss-20b:free",
-  "qwen/qwen3-coder:free",
-  "tngtech/deepseek-r1t2-chimera:free",
-] as const;
-export type FreeModel = typeof FREE_MODELS[number];
+// ...existing code...
 
 function profileContext(p: ChatProfile): string {
   const parts: string[] = [];
@@ -85,9 +80,15 @@ export async function chatWithAssistant(
   selectedModel?: string,
   opts?: { signal?: AbortSignal; idToken?: string }
 ): Promise<string> {
+  // Validate model against FREE_MODELS
+  let model = (selectedModel || "openai/gpt-oss-20b:free").trim();
+  const allowedIds = FREE_MODELS.map((m: any) => typeof m === "string" ? m : m.id);
+  if (!allowedIds.includes(model)) {
+    model = "openai/gpt-oss-20b:free";
+  }
   const body = {
     message,
-    model: (selectedModel || "openai/gpt-oss-20b:free").trim()
+    model
   };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts?.idToken) headers["id_token"] = opts.idToken;
@@ -112,9 +113,15 @@ export async function chatCompletion({ message, selectedModel, idToken }: {
   selectedModel?: string;
   idToken?: string;
 }) {
+  // Validate model against FREE_MODELS
+  let model = (selectedModel || "openai/gpt-oss-20b:free").trim();
+  const allowedIds = FREE_MODELS.map((m: any) => typeof m === "string" ? m : m.id);
+  if (!allowedIds.includes(model)) {
+    model = "openai/gpt-oss-20b:free";
+  }
   const body = {
     message,
-    model: (selectedModel || "openai/gpt-oss-20b:free").trim()
+    model
   };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (idToken) headers["id_token"] = idToken;

@@ -11,24 +11,27 @@ export function sanitizeAndShapeReply(input: string): string {
 
   let text = input;
 
-  // Remove <think>...</think> and meta lines
+  // Remove <think>...</think> and meta lines (robust)
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  text = text.replace(/^\s*(SUMMARY:|TRY:|AI SUGGESTION:).*$/gim, "");
+  // Remove meta lines like SUMMARY:, TRY:, AI SUGGESTION: with leading dashes, spaces, mixed case
+  text = text.replace(/^[\s\-]*((summary|try|ai suggestion)\s*:).*/gim, "");
   text = text.replace(/\n{2,}/g, "\n");
 
-  // Normalize section headers
-  const map: Record<string, string> = {
-    summary: "🎯 **Summary**",
-    "skill gaps": "🕳️ **Skill Gaps**",
-    gaps: "🕳️ **Skill Gaps**",
-    improvements: "🔧 **Improvements**",
-    pros: "✅ **Pros**",
-    cons: "👎 **Cons**",
-    rating: "⭐ **Rating**",
-    tip: "💡 **Tip**",
+  // Normalize section headers to capitalized short headings (not all caps, not code blocks)
+  const headingMap: Record<string, string> = {
+    summary: "Summary",
+    "skill gaps": "Skill Gaps",
+    gaps: "Skill Gaps",
+    improvements: "Improvements",
+    pros: "Pros",
+    cons: "Cons",
+    rating: "Rating",
+    tip: "Tip",
+    "next steps": "Next Steps"
   };
-  for (const [k, v] of Object.entries(map)) {
-    const re = new RegExp(`^${k}:?`, "gim");
+  for (const [k, v] of Object.entries(headingMap)) {
+    // Match heading at start of line, with optional colon, mixed case
+    const re = new RegExp(`^\s*${k.replace(/ /g, "[ _-]?")}:?`, "gim");
     text = text.replace(re, `${v}\n`);
   }
 

@@ -58,9 +58,9 @@ export default function ChatWidget({
 
   const faqs = useMemo(
     () => [
-      "Rate my resume & top 3 fixes",
-      "What roles fit my skills right now?",
-      "Skills to add for a paid internship",
+      "Find ML internships for Summer 2026 (India)",
+      "Skill gap vs Google SDE-1 (top 5 gaps + 2-week plan)",
+      "3 unique project ideas using Python + APIs"
     ],
     []
   );
