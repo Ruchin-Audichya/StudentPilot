@@ -15,6 +15,14 @@ export function sanitizeAndShapeReply(input: string): string {
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
   // Remove meta lines like SUMMARY:, TRY:, AI SUGGESTION: with leading dashes, spaces, mixed case
   text = text.replace(/^[\s\-]*((summary|try|ai suggestion)\s*:).*/gim, "");
+  // Remove lines starting with analysis, assistantfinal, final, etc.
+  text = text.replace(/^[\s\-]*(analysis|assistantfinal|final|reflection|reasoning|let'?s produce)\s*:?.*/gim, "");
+  // Remove stray 'Let's produce' and similar phrases anywhere
+  text = text.replace(/let'?s produce[\s\S]*?(?=\n|$)/gi, "");
+  // Remove stray XML/meta tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Collapse whitespace and repeated newlines
+  text = text.replace(/[ \t]+\n/g, "\n");
   text = text.replace(/\n{2,}/g, "\n");
 
   // Normalize section headers to capitalized short headings (not all caps, not code blocks)
