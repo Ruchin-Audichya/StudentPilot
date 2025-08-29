@@ -19,6 +19,7 @@ export interface JobSearchParams {
   skills: string[];
   interests: string[];
   location?: string;
+  linkedin_enabled?: boolean;
 }
 
 import { API_BASE } from "../lib/apiBase";

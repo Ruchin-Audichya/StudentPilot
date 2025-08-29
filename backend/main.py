@@ -443,11 +443,12 @@ def search_internships(req: SearchRequest):
     debug_scrapers = os.getenv("DEBUG_SCRAPERS", "0") in {"1","true","yes"}
     if debug_scrapers:
         print(f"[scrape] starting queries={len(queries)} -> {list(queries)[:6]}")
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    linkedin_enabled = getattr(req, 'linkedin_enabled', False)
+    with ThreadPoolExecutor(max_workers=12) as executor:
         futures = []
         for q in queries:
             futures.append(executor.submit(fetch_internships, q, location))
-            if not DISABLE_LINKEDIN:
+            if linkedin_enabled and not DISABLE_LINKEDIN:
                 linkedin_fetch = _maybe_import_linkedin()
                 futures.append(executor.submit(linkedin_fetch, q, location))
         for f in as_completed(futures):

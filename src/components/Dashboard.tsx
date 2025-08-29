@@ -36,6 +36,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [location, setLocation] = useState<string>("India");
   const [results, setResults] = useState<JobResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [linkedinEnabled, setLinkedinEnabled] = useState(false);
 
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -127,7 +128,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   async function handleSearch() {
     setLoading(true);
     try {
-      const jobs = await searchInternships({ skills, interests, location });
+      const jobs = await searchInternships({ skills, interests, location, linkedin_enabled: linkedinEnabled });
       setResults(jobs);
     } catch (err) {
       console.error("Search failed", err);
@@ -285,13 +286,24 @@ export default function Dashboard({ profile }: DashboardProps) {
           <div className="glass-card rounded-3xl p-5 md:p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="text-lg font-semibold">Find Internships</h2>
-              <button
-                onClick={handleSearch}
-                disabled={loading}
-                className="rounded-full px-5 py-2 gradient-success text-white shadow-md hover:shadow-lg hover:opacity-95 active:scale-[0.99] transition disabled:opacity-50"
-              >
-                {loading ? "Searching..." : "Search"}
-              </button>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={linkedinEnabled}
+                    onChange={e => setLinkedinEnabled(e.target.checked)}
+                    className="accent-indigo-500"
+                  />
+                  Enable LinkedIn Matching
+                </label>
+                <button
+                  onClick={handleSearch}
+                  disabled={loading}
+                  className="rounded-full px-5 py-2 gradient-success text-white shadow-md hover:shadow-lg hover:opacity-95 active:scale-[0.99] transition disabled:opacity-50"
+                >
+                  {loading ? "Searching..." : "Search"}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input

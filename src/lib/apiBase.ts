@@ -18,15 +18,17 @@ function computeApiBase(): string {
       }
     }
   } catch {/* ignore */}
-  if (isVercel) {
-    // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
-      if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
-        return 'https://studentpilot.onrender.com';
-    }
-    return cleaned.replace(/\/$/, '');
+  // Use Render backend for Vercel or production
+  if (isVercel || window.location.hostname.endsWith('onrender.com')) {
+    return 'https://studentpilot.onrender.com';
+  }
+  // Use local backend for localhost/dev
+  if (window.location.hostname.startsWith('localhost') || window.location.hostname.startsWith('127.')) {
+    return 'http://127.0.0.1:8000';
   }
   if (cleaned) return cleaned.replace(/\/$/, '');
-  return 'http://127.0.0.1:8000';
+  // Default to Render backend if nothing else matches
+  return 'https://studentpilot.onrender.com';
 }
 
 export const API_BASE = computeApiBase();
