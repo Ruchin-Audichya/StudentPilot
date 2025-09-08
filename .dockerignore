@@ -1,0 +1,22 @@
+# Keep Docker builds slim and fast
+.git
+.github
+node_modules
+dist
+.cache
+.next
+coverage
+*.log
+
+# Python venvs and caches
+backend/.venv
+backend/__pycache__
+__pycache__
+*.py[cod]
+
+# Local envs (set on Render dashboard instead)
+.env
+backend/.env
+
+# VS Code
+.vscode

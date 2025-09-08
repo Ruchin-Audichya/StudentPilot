@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: studentpilot
+    env: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DISABLE_LINKEDIN
+        value: "1"
+      - key: SEARCH_TIME_BUDGET
+        value: "7"
+      - key: CORS_ORIGINS
+        value: "https://studentpilot.vercel.app,https://wms-virid-six.vercel.app,https://studentpilot.onrender.com,http://localhost:5173"
+      - key: FRONTEND_ORIGIN
+        value: "https://studentpilot.vercel.app"
+      - key: OPENROUTER_MODELS
+        value: "deepseek/deepseek-chat-v3-0324:free"
