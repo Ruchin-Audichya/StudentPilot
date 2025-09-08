@@ -597,7 +597,7 @@ def search_internships(req: SearchRequest):
             # Python <3.9 fallback
             executor.shutdown(wait=False)
 
-    if not all_jobs:
+    if not all_jobs and os.getenv("ALLOW_SAMPLE_FALLBACK", "1") in {"1","true","yes","on"}:
         # Fallback: return synthetic sample results so UI still functions
         if debug_scrapers:
             print("[scrape] no real jobs fetched, returning fallback samples")
@@ -615,7 +615,7 @@ def search_internships(req: SearchRequest):
                 "tags": ["sample", "offline-mode"],
                 "posted": "today",
             })
-        all_jobs = sample
+    all_jobs = sample
 
     # Deduplicate
     all_jobs = _dedupe(all_jobs)

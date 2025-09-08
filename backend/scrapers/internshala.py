@@ -15,12 +15,15 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/123.0 Safari/537.36"
     ),
-    "Accept-Language": "en-US,en;q=0.9"
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Referer": "https://internshala.com/internships",
 }
 
 # Shared session with simple retries (network resilience) and polite timeouts.
 _session = requests.Session()
-_retries = Retry(total=1, backoff_factor=0.3, status_forcelist=[429,500,502,503,504], allowed_methods=["GET"])  # type: ignore
+# Slightly higher retries for flaky datacenter IPs; keep small to respect time budget
+_retries = Retry(total=2, backoff_factor=0.4, status_forcelist=[429,500,502,503,504], allowed_methods=["GET"])  # type: ignore
 _session.mount("https://", HTTPAdapter(max_retries=_retries))
 _session.headers.update(HEADERS)
 
@@ -192,6 +195,26 @@ def _fetch_detail_page(url: str) -> Dict[str, str]:
         pass
     return out
 
+def _candidate_urls(enhanced_query: str, location: Optional[str]) -> List[str]:
+    q = "-".join(enhanced_query.strip().split())
+    urls = []
+    # Prefer simpler keyword pages first (less likely to be blocked), then category-filtered
+    base_kw = f"{BASE_URL}/internships/keywords-{q}"
+    urls.append(base_kw)
+    if location:
+        loc = "-".join(location.strip().split())
+        urls.append(f"{base_kw}/in-{loc}")
+    # Category-filtered variants (can be heavier; try last)
+    cat = "/category-computer%20science,information%20technology,software%20development,web%20development"
+    urls.append(base_kw + cat)
+    if location:
+        urls.append(f"{base_kw}/in-{'-'.join(location.strip().split())}" + cat)
+    # Pagination page-1 variants as a last resort
+    urls.append(base_kw + "/page-1")
+    if location:
+        urls.append(f"{base_kw}/in-{'-'.join(location.strip().split())}/page-1")
+    return urls
+
 def fetch_internships(query: str, location: Optional[str] = None, limit: int = 12) -> List[Dict]:
     """
     Scrape Internshala for tech-focused internships matching the given keyword query.
@@ -201,23 +224,26 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
     # Enhance query for better tech job targeting
     enhanced_query = _enhance_query_for_tech(query)
     
-    q = "-".join(enhanced_query.strip().split())
-    url = f"{BASE_URL}/internships/keywords-{q}"
-    if location:
-        loc = "-".join(location.strip().split())
-        url += f"/in-{loc}"
-    
-    # Add category filter for tech-related categories
-    url += "/category-computer%20science,information%20technology,software%20development,web%20development"
-
-    try:
-        resp = _session.get(url, timeout=10)
-        resp.raise_for_status()
-    except Exception:
+    urls = _candidate_urls(enhanced_query, location)
+    soup = None
+    last_err = None
+    cards = []
+    used_url = None
+    for u in urls:
+        try:
+            resp = _session.get(u, timeout=10)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.content, "html.parser")
+            cards = soup.select("div.container-fluid.individual_internship")
+            if cards:
+                used_url = u
+                break
+        except Exception as e:
+            last_err = e
+            continue
+    if not cards:
+        # Give up silently; upstream will synthesize samples if needed
         return []
-
-    soup = BeautifulSoup(resp.content, "html.parser")
-    cards = soup.select("div.container-fluid.individual_internship")
     items: List[Dict] = []
 
     for idx, card in enumerate(cards[:limit*2]):  # Fetch more initially to filter better
@@ -250,7 +276,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         extra = {}
         if link:
             # Fetch details for first few items to stay fast
-            if idx < 6:
+            if idx < 3:
                 extra = _fetch_detail_page(link)
 
         # Calculate tech relevance score
@@ -258,8 +284,8 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         skills_required = extra.get("skills_required") or []
         tech_score = _calculate_tech_relevance_score(title, full_desc, skills_required)
 
-        # Filter out low-relevance jobs (score < 25) to avoid over-filtering
-        if tech_score < 25:
+        # Filter out low-relevance jobs; keep threshold modest on prod infra
+        if tech_score < 15:
             continue
 
         # Merge tags with auto-detected ones
@@ -276,7 +302,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
             "company": _normalize(company),
             "location": _normalize(loc_txt),
             "stipend": stipend or None,
-            "apply_url": link or url,
+            "apply_url": link or used_url,
             "description": _normalize(full_desc)[:800],
             "tags": combined_tags,
             "source": "internshala",
