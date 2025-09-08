@@ -1,0 +1,92 @@
+name: Deploy FastAPI Backend to Elastic Beanstalk
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-eb.yml'
+
+concurrency:
+  group: eb-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      EB_APP_NAME: WheresMyStipend
+      EB_ENV_NAME: WheresMyStipend-env-1
+      AWS_REGION: ap-south-1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run smoke tests
+        run: |
+          if [ -f smoke_test.py ]; then python smoke_test.py; else echo 'No smoke tests found'; fi
+
+      - name: Install AWS EB CLI
+        run: pip install awsebcli
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Prepare Elastic Beanstalk config
+        run: |
+          mkdir -p .elasticbeanstalk
+          cat > .elasticbeanstalk/config.yml <<'YAML'
+branch-defaults:
+  main:
+    environment: WheresMyStipend-env-1
+global:
+  application_name: WheresMyStipend
+  default_platform: Python 3.12 running on 64bit Amazon Linux 2023
+  default_region: ap-south-1
+  workspace_type: Application
+YAML
+          echo '--- .elasticbeanstalk/config.yml ---'
+          cat .elasticbeanstalk/config.yml
+
+      - name: Ensure Procfile
+        run: |
+          echo 'web: gunicorn -k uvicorn.workers.UvicornWorker main:app --timeout 120 --workers 3 --bind 0.0.0.0:$PORT' > Procfile
+          echo 'Procfile contents:'
+          cat Procfile
+
+      - name: Deploy to Elastic Beanstalk
+        env:
+          AWS_DEFAULT_REGION: ap-south-1
+        run: |
+          eb init "$EB_APP_NAME" --platform "Python 3.12 running on 64bit Amazon Linux 2023" --region "$AWS_REGION" || true
+          eb use "$EB_ENV_NAME" || true
+          LABEL="ci-$(date +'%Y%m%d-%H%M%S')"
+          echo "Deploying version $LABEL"
+          eb deploy "$EB_ENV_NAME" --staged --label "$LABEL"
+
+      - name: Post-deploy health check
+        run: |
+          echo 'Waiting 40s for environment to settle...'
+          sleep 40
+          eb health "$EB_ENV_NAME" --verbose || true
+          eb status "$EB_ENV_NAME" || true

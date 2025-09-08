@@ -1,0 +1,21 @@
+John Doe
+Email: john.doe@example.com
+Phone: +1 555 123 4567
+Location: Bangalore, India
+
+SUMMARY
+Aspiring backend and machine learning engineer with strong foundation in Python, FastAPI, Docker, SQL, data analysis and model deployment.
+
+SKILLS
+Python, FastAPI, Django, REST APIs, PostgreSQL, MySQL, SQL, Docker, Kubernetes, AWS, Linux, Git, Pandas, NumPy, Scikit-Learn, TensorFlow, Pytorch, MLflow, Redis
+
+EXPERIENCE
+Project: Real-time analytics pipeline
+- Built a FastAPI microservice (Python) that ingests events and stores them in PostgreSQL (reduced processing latency by 35%).
+- Deployed containerized service using Docker and optimized image size.
+
+Project: ML model deployment
+- Trained scikit-learn classification model and served via FastAPI with Docker & AWS.
+
+EDUCATION
+B.Tech Computer Science 2025

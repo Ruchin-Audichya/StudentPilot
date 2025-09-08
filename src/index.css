@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Project Nexus Design System - Modern Tech Dashboard */
+
+@layer base {
+  :root {
+    /* Core Background & Text */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    /* Cards with glass effect */
+    --card: 240 10% 7%;
+    --card-secondary: 240 10% 10%;
+    --card-border: 240 10% 15%;
+    --card-foreground: 0 0% 95%;
+
+    /* Tech-focused gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(261 83% 58%) 0%, hsl(220 100% 65%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(300 100% 85%) 0%, hsl(261 83% 58%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(44 100% 77%) 0%, hsl(26 100% 68%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(158 64% 52%) 100%);
+    
+    /* Enhanced colors */
+    --primary: 261 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 261 83% 70%;
+    
+    --secondary: 240 10% 15%;
+    --secondary-foreground: 0 0% 90%;
+    
+    --accent: 44 100% 77%;
+    --accent-foreground: 240 10% 10%;
+    
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    --muted: 240 5% 20%;
+    --muted-foreground: 240 5% 65%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 240 10% 15%;
+    --input: 240 10% 10%;
+    --ring: 261 83% 58%;
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 95%;
+    
+    /* Shadows with glow effects */
+    --shadow-primary: 0 10px 40px -10px hsl(261 83% 58% / 0.3);
+    --shadow-card: 0 4px 20px -4px hsl(240 10% 0% / 0.4);
+    --shadow-glow: 0 0 40px hsl(261 83% 70% / 0.4);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/50 backdrop-blur-xl border border-card-border;
+    box-shadow: var(--shadow-card);
+  }
+  
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+  
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+  
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

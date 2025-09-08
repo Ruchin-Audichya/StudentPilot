@@ -1,0 +1,2 @@
+# This file is intentionally minimal. Use backend/requirements.txt for server dependencies.
+# Kept for compatibility with some IDEs.
