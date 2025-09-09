@@ -561,11 +561,12 @@ def search_internships(req: SearchRequest):
     import time
     start_time = time.time()
     limited = list(queries)[:max_queries]
+    per_query_limit = int(os.getenv("SEARCH_PER_QUERY_LIMIT", "14"))
     executor = ThreadPoolExecutor(max_workers=6)
     try:
         futures = []
         for idx, q in enumerate(limited):
-            futures.append(executor.submit(fetch_internships, q, location))
+            futures.append(executor.submit(fetch_internships, q, location, per_query_limit))
             # Limit LinkedIn Selenium fetch to first 2 queries to reduce heavy startup cost
             if not DISABLE_LINKEDIN and idx < 2:
                 try:
