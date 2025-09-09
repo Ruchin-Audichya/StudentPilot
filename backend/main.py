@@ -615,7 +615,7 @@ def search_internships(req: SearchRequest):
                 "tags": ["sample", "offline-mode"],
                 "posted": "today",
             })
-    all_jobs = sample
+        all_jobs = sample
 
     # Deduplicate
     all_jobs = _dedupe(all_jobs)
