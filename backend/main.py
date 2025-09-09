@@ -137,7 +137,11 @@ buzzword_roles = set()
 # -----------------------------
 # Load Buzzwords CSV
 # -----------------------------
-csv_path = os.path.join(os.path.dirname(__file__), "btech_buzzwords.csv")
+# Prefer the repository path under backend/data/, fall back to legacy location
+_here = os.path.dirname(__file__)
+csv_path = os.path.join(_here, "data", "btech_buzzwords.csv")
+if not os.path.exists(csv_path):
+    csv_path = os.path.join(_here, "btech_buzzwords.csv")
 if os.path.exists(csv_path):
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
