@@ -553,9 +553,11 @@ def search_internships(req: SearchRequest):
     debug_scrapers = os.getenv("DEBUG_SCRAPERS", "0") in {"1","true","yes"}
     if debug_scrapers:
         print(f"[scrape] starting queries={len(queries)} -> {list(queries)[:6]}")
-    # Keep responsiveness: cap queries and add a 6s overall budget
-    max_queries = 6
-    time_budget_s = float(os.getenv("SEARCH_TIME_BUDGET", "6.0"))
+    # Keep responsiveness but allow tuning for more coverage via env vars
+    # SEARCH_MAX_QUERIES: how many distinct query variants to dispatch (default 8)
+    # SEARCH_TIME_BUDGET: overall seconds to wait for results (default 8.0)
+    max_queries = int(os.getenv("SEARCH_MAX_QUERIES", "8"))
+    time_budget_s = float(os.getenv("SEARCH_TIME_BUDGET", "8.0"))
     import time
     start_time = time.time()
     limited = list(queries)[:max_queries]
@@ -643,27 +645,29 @@ def search_internships(req: SearchRequest):
         if not jobs:
             continue
         max_s = max(j["score"] for j in jobs) or 1
-        for j in jobs:
+    for j in jobs:
             j["score"] = round((j["score"] / max_s) * 100, 2)
 
     # Sort inside each source
     for src in by_source:
         by_source[src].sort(key=lambda x: x["score"], reverse=True)
 
-    # Balanced interleave: at least 40% from each if available
+    # Balanced interleave: at least 40% from each if available. Cap total with env.
+    final_cap = int(os.getenv("SEARCH_MAX_RESULTS", "80"))
     final_jobs = []
     src_names = list(by_source.keys())
-    while any(by_source.values()) and len(final_jobs) < 50:
+    while any(by_source.values()) and len(final_jobs) < final_cap:
         for src in src_names:
             if by_source[src]:
                 final_jobs.append(by_source[src].pop(0))
 
-    # Limit duplicate roles in top results
+    # Limit duplicate roles in top results (gentle)
+    dup_threshold = int(os.getenv("DUPLICATE_ROLE_LIMIT_N", "30"))
     seen_roles = set()
     diverse_jobs = []
     for job in final_jobs:
         role_key = job["title"].split()[0].lower()
-        if role_key in seen_roles and len(diverse_jobs) < 20:
+        if role_key in seen_roles and len(diverse_jobs) < dup_threshold:
             continue
         seen_roles.add(role_key)
         diverse_jobs.append(job)
