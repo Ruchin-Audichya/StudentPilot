@@ -447,6 +447,47 @@ def _ai_enhanced_response(
             except Exception:
                 _set_last_ai_error(str(e)[:300])
             continue
+    # If OpenRouter failed across all models, try Gemini as a transparent fallback (when configured)
+    try:
+        if GOOGLE_API_KEY:
+            # Build a compact prompt reusing the same mode and context
+            combined = (
+                f"{system_prompt}\n\n{mode_hint}\n"
+                f"User message: {user_message}\n"
+                f"Profile: {json.dumps(profile_snippet)}\n"
+                f"Resume excerpt: {resume_excerpt}"
+            )
+            payload = {
+                "contents": [
+                    {"role": "user", "parts": [{"text": combined}]}
+                ],
+                "generationConfig": {
+                    "temperature": temp,
+                    "maxOutputTokens": max_toks
+                }
+            }
+            # Use fast, low-cost model
+            g_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
+            g_resp = _gemini_generate_content(g_model, payload)
+            # Extract text
+            text = None
+            try:
+                cands = (g_resp or {}).get("candidates") or []
+                if cands:
+                    parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
+                    # Concatenate all text parts
+                    texts = [p.get("text") for p in parts if isinstance(p, dict) and p.get("text")]
+                    text = "\n".join(texts).strip() if texts else None
+            except Exception:
+                text = None
+            if text:
+                return text
+    except Exception as _e:
+        # Preserve last OpenRouter error; don't overwrite with Gemini specifics
+        if os.getenv("AI_DEBUG", "0") in {"1","true","yes"}:
+            import logging
+            logging.basicConfig(level=logging.INFO)
+            logging.error("Gemini fallback failed: %s", _e)
     return ""
 
 def _set_last_ai_error(msg: Optional[str]):
