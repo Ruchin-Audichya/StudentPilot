@@ -1,4 +1,5 @@
 # backend/scrapers/internshala.py
+import os
 import requests
 import time
 import re
@@ -232,16 +233,26 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
     enhanced_query = _enhance_query_for_tech(query)
     
     urls = _candidate_urls(enhanced_query, location)
+    # Tunables
+    # Allow either INTERNSHALA_HTTP_TIMEOUT or legacy INSHALA_HTTP_TIMEOUT
+    req_timeout = int(os.getenv("INTERNSHALA_HTTP_TIMEOUT", os.getenv("INSHALA_HTTP_TIMEOUT", "15")))
+    tech_min = float(os.getenv("TECH_RELEVANCE_MIN", "8"))
+    debug = os.getenv("DEBUG_SCRAPERS", "0").lower() in {"1","true","yes","on"}
     soup = None
     last_err = None
     cards = []
     used_url = None
     for u in urls:
         try:
-            resp = _session.get(u, timeout=12)
+            resp = _session.get(u, timeout=req_timeout)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.content, "html.parser")
-            cards = soup.select("div.container-fluid.individual_internship")
+            # Try multiple selector variants; site markup changes periodically
+            cards = soup.select("div.individual_internship")
+            if not cards:
+                cards = soup.select("div.container-fluid.individual_internship")
+            if not cards:
+                cards = soup.select("div[class*='individual_internship']")
             if cards:
                 used_url = u
                 break
@@ -249,28 +260,30 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
             last_err = e
             continue
     if not cards:
-        # Give up silently; upstream will synthesize samples if needed
+        if debug:
+            print(f"[internshala] no cards found. last_err={last_err} url_tried={used_url}")
+        # Give up silently; upstream will synthesize samples if enabled
         return []
     items: List[Dict] = []
 
     for idx, card in enumerate(cards[:limit*3]):  # Fetch more initially to filter better
-        title_tag = card.select_one("h3 a")
+        title_tag = card.select_one("h3 a, a.view_detail_button, a[href*='/internship/']")
         title = title_tag.get_text(strip=True) if title_tag else "Internship"
 
-        company_tag = card.select_one("div.company_name a")
+        company_tag = card.select_one("div.company_name a, div.company_name, .company_and_premium span.company-name")
         company = company_tag.get_text(strip=True) if company_tag else "Company"
 
         link = title_tag.get("href") if title_tag else None
         if link and link.startswith("/"):
             link = BASE_URL + link
 
-        loc_tag = card.select_one(".locations > a, .location_link")
+        loc_tag = card.select_one(".locations > a, .location_link, .location, .locations span")
         loc_txt = loc_tag.get_text(strip=True) if loc_tag else "India"
 
-        stipend_node = card.select_one(".stipend")
+        stipend_node = card.select_one(".stipend, span.stipend")
         stipend = stipend_node.get_text(strip=True) if stipend_node else ""
 
-        desc_sec = card.select_one(".internship_meta") or card
+        desc_sec = card.select_one(".internship_meta, .other_detail_item_row, .details, .internship_desc") or card
         desc_text = desc_sec.get_text(" ", strip=True)
 
         tags = []
@@ -281,10 +294,8 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
 
         # Fetch detail page for full info
         extra = {}
-        if link:
-            # Fetch details for first few items to stay fast
-            if idx < 3:
-                extra = _fetch_detail_page(link)
+        if link and idx < 3:
+            extra = _fetch_detail_page(link)
 
         # Calculate tech relevance score
         full_desc = extra.get("description_full") or desc_text
@@ -292,7 +303,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         tech_score = _calculate_tech_relevance_score(title, full_desc, skills_required)
 
         # Filter out low-relevance jobs; keep threshold modest on prod infra
-        if tech_score < 12:
+        if tech_score < tech_min:
             continue
 
         # Merge tags with auto-detected ones
