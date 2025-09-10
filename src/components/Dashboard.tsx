@@ -9,6 +9,7 @@ import JobCard from "@/components/JobCard";
 import BackendDebug from "@/components/BackendDebug";
 import "../App.css";
 import FilterBox from "@/components/FilterBox";
+import TopNav from "@/components/TopNav";
 
 interface StudentProfile {
   name: string;
@@ -270,6 +271,13 @@ export default function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="min-h-screen p-6 md:p-8">
+      <TopNav
+        actions={[
+          { label: "🎙️ Mock Interview", to: "/mock-interview" },
+          { label: "🧠 Resume Genius", to: "/resume-genius" },
+          { label: "Logout", to: "/logout" },
+        ]}
+      />
       <div className="mb-4">
         <BackendDebug />
       </div>
@@ -291,8 +299,8 @@ export default function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
 
-      {/* Top bar */}
-  <header className="mb-8 flex items-center justify-between animate-fade-in">
+      {/* Greeting */}
+      <header className="mb-8 animate-fade-in">
         <div className="text-left">
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
             Hi, {firstName} 👋
@@ -301,28 +309,6 @@ export default function Dashboard({ profile }: DashboardProps) {
             Let’s help you land your dream internship.
           </p>
         </div>
-
-        {/* New Mock Interview Button */}
-          <button
-            onClick={() => navigate('/mock-interview')}
-            className="btn btn-info hover-lift"
-          >
-            🎙️ Mock Interview
-          </button>
-
-        {/* Resume Genius Button */}
-          <button
-            onClick={() => navigate('/resume-genius')}
-            className="btn btn-gradient hover-lift"
-          >
-            🧠 Resume Genius
-          </button>
-        <a
-          href="/logout"
-          className="btn btn-danger hover-lift"
-        >
-          Logout
-        </a>
       </header>
 
       {/* Main content layout */}

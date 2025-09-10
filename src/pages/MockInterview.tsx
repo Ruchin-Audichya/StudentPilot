@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import TopNav from "@/components/TopNav";
 
 declare global {
     interface Window {
@@ -108,9 +109,14 @@ const MockInterview = () => {
     const ttsResolveRef = useRef<(() => void) | null>(null);
     const bargedInRef = useRef<boolean>(false);
     const voiceActiveFramesRef = useRef<number>(0);
+    // Remove auto-advance for demo reliability
     const autoAdvanceTimerRef = useRef<number | null>(null);
 
+    // Finite-state machine for robust control
+    const [phase, setPhase] = useState<'idle' | 'question' | 'listening' | 'processing' | 'feedback' | 'ended'>('idle');
+
     const [isInterviewActive, setIsInterviewActive] = useState(false);
+    const isInterviewActiveRef = useRef(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [questionDisplay, setQuestionDisplay] = useState("Click 'Start Interview' to begin.");
     const [userResponse, setUserResponse] = useState("(Your spoken answer will appear here)");
@@ -159,20 +165,11 @@ const MockInterview = () => {
         }
     }, []);
 
-    const scheduleAutoAdvance = useCallback((ms: number) => {
-        try {
-            if (autoAdvanceTimerRef.current) {
-                window.clearTimeout(autoAdvanceTimerRef.current);
-                autoAdvanceTimerRef.current = null;
-            }
-            autoAdvanceTimerRef.current = window.setTimeout(() => {
-                setCurrentQuestionIndex(prev => prev + 1);
-            }, ms);
-        } catch {}
-    }, []);
+    // No auto-advance; questions advance only when user clicks Next
 
     // Function to speak the question using Gemini TTS
     const speakQuestion = useCallback(async (questionText) => {
+        if (!isInterviewActiveRef.current) return; // Guard against stray calls
         setStatusMessage("Interviewer speaking...");
         // Slight variety in prosody: optional preface and small pre-silence
         const prefaces = ["Okay.", "Alright.", "Got it.", "Thanks."];
@@ -327,6 +324,7 @@ const MockInterview = () => {
         recognition.onstart = () => {
             setIsRecording(true);
             setStatusMessage("Listening for your answer...");
+            setPhase('listening');
             latestTranscriptRef.current = "";
             recActiveRef.current = true;
             lastVoiceTsRef.current = Date.now();
@@ -358,22 +356,24 @@ const MockInterview = () => {
     recognition.onend = async () => {
             setIsRecording(false);
             setStatusMessage("Processing your answer...");
+            setPhase('processing');
             recActiveRef.current = false;
             answerLockedRef.current = true; // freeze displayed answer for this question
             const finalAnswer = (latestTranscriptRef.current || '').trim();
             if (finalAnswer) {
                 await getAIResponse(interviewQuestions[currentQuestionIndex], finalAnswer);
                 setBodyLanguageFeedback(getSimulatedBodyLanguageFeedback());
-        // Auto-advance to next question after a 2-minute pause
-        setTimeout(() => { try { (document.activeElement as HTMLElement)?.blur?.(); } catch {}; }, 100);
-        setTimeout(() => { try { (document.documentElement as any).scrollTop = 0; } catch {}; }, 150);
-        setTimeout(() => { try { (speechRecognitionRef.current as any)?.abort?.(); } catch {} }, 200);
-        setStatusMessage("Take your time to review the feedback. Auto‑advancing in about 2 minutes…");
-        scheduleAutoAdvance(120000);
+                // Post-processing UX polish only; no auto-advance to avoid unexpected TTS
+                setTimeout(() => { try { (document.activeElement as HTMLElement)?.blur?.(); } catch {}; }, 100);
+                setTimeout(() => { try { (document.documentElement as any).scrollTop = 0; } catch {}; }, 150);
+                setTimeout(() => { try { (speechRecognitionRef.current as any)?.abort?.(); } catch {} }, 200);
+                setStatusMessage("Review the feedback, then click Next Question when ready.");
+                setPhase('feedback');
             } else {
                 setAiFeedback("No answer detected. Please try again.");
                 setBodyLanguageFeedback("");
                 setStatusMessage("No speech detected. Click Next to try again or End Interview.");
+                setPhase('feedback');
             }
         };
 
@@ -396,12 +396,17 @@ const MockInterview = () => {
             autoAdvanceTimerRef.current = null;
         }
         setIsInterviewActive(false);
+        isInterviewActiveRef.current = false;
+        setPhase('ended');
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
         }
         if (speechRecognitionRef.current) {
             speechRecognitionRef.current.stop();
         }
+        // Stop any ongoing interviewer TTS and metering loop
+        try { stopQuestionTTS(); } catch {}
+        if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
         if (webcamVideoRef.current) {
             webcamVideoRef.current.srcObject = null;
         }
@@ -412,22 +417,24 @@ const MockInterview = () => {
         setStatusMessage("Interview ended.");
         setIsRecording(false);
         setIsProcessing(false);
-    }, []); // Empty dependency array means it's stable
+    }, [stopQuestionTTS]); // stable enough
 
     // Ask the current question (Now `endInterview` is defined)
     const askQuestion = useCallback(async () => {
+        if (!isInterviewActiveRef.current) return;
         if (currentQuestionIndex < interviewQuestions.length) {
+            setPhase('question');
             setQuestionDisplay("Interviewer is thinking...");
             setUserResponse("");
             setAiFeedback("");
             setBodyLanguageFeedback("");
 
         const question = interviewQuestions[currentQuestionIndex];
-            setQuestionDisplay(question); // Display text immediately as fallback
+        setQuestionDisplay(question); // Display text immediately as fallback
         await speakQuestion(question);
             if (speechRecognitionRef.current) {
                 try {
-        latestTranscriptRef.current = "";
+            latestTranscriptRef.current = "";
             answerLockedRef.current = false; // unlock for new answer
                     speechRecognitionRef.current.start();
                 } catch (e) {
@@ -454,6 +461,7 @@ const MockInterview = () => {
         setBodyLanguageFeedback("(Simulated feedback on body language will appear here)");
         setStatusMessage("");
         setShowNoCameraMessage(false);
+        setPhase('idle');
 
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -480,6 +488,7 @@ const MockInterview = () => {
                 if (!audioContextRef.current) {
                     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
                 }
+                try { audioContextRef.current?.resume?.(); } catch {}
                 const ctx = audioContextRef.current!;
                 // Create or reuse nodes
                 if (!micSourceRef.current) {
@@ -558,6 +567,8 @@ const MockInterview = () => {
             };
             ensureAudio();
             setIsInterviewActive(true);
+            isInterviewActiveRef.current = true;
+            setPhase('question');
             // Initialize adaptive thresholds to defaults at start
             noiseFloorRef.current = 0.015;
             silenceThresholdRef.current = 0.02;
@@ -578,8 +589,13 @@ const MockInterview = () => {
             window.clearTimeout(autoAdvanceTimerRef.current);
             autoAdvanceTimerRef.current = null;
         }
+        // Only advance after feedback for deterministic flow
+        if (phase !== 'feedback') {
+            setStatusMessage('Please complete your answer and review feedback before moving on.');
+            return;
+        }
         setCurrentQuestionIndex(prevIndex => prevIndex + 1);
-    }, []);
+    }, [phase]);
 
     // Mic calibration: estimate ambient noise and update dynamic thresholds
     const calibrateMic = useCallback(async () => {
@@ -639,7 +655,7 @@ const MockInterview = () => {
 
     // Cleanup effect
     useEffect(() => {
-        return () => {
+    return () => {
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
             }
@@ -650,8 +666,10 @@ const MockInterview = () => {
                 window.clearTimeout(autoAdvanceTimerRef.current);
                 autoAdvanceTimerRef.current = null;
             }
+        try { stopQuestionTTS(); } catch {}
+        if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
         };
-    }, []);
+    }, [stopQuestionTTS]);
 
     // Ensure audio context is created on user gesture and track live video state reliably
     useEffect(() => {
@@ -701,106 +719,117 @@ const MockInterview = () => {
     }, [micMonitorOn, micGain]);
 
     return (
-        <div className="bg-gray-900 min-h-screen flex items-center justify-center p-4">
-            <div className="flex flex-col md:flex-row gap-8 w-full max-w-6xl mx-auto p-6 md:p-10 rounded-3xl bg-gray-700/30 backdrop-blur-xl border border-white/20 shadow-lg shadow-black/20">
-                <div className="w-full md:w-1/2 flex flex-col gap-6">
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white text-center mb-4 leading-tight">Mock Interview AI 🗣️</h1>
-                    <div className="relative w-full aspect-video rounded-3xl overflow-hidden border border-white/20 shadow-xl">
-                        <video ref={webcamVideoRef} autoPlay playsInline muted className="w-full h-full object-cover"></video>
-                        {showNoCameraMessage && !hasLiveVideo && (
-                            <div className="absolute inset-0 bg-gray-900/80 flex items-center justify-center text-white text-lg font-medium p-4 text-center">
-                                Webcam access denied or not available. Please allow camera access to start the interview.
-                            </div>
-                        )}
-                    </div>
+        <div className="min-h-screen p-6 md:p-8">
+            <TopNav
+                actions={[
+                    { label: "🏠 Home", to: "/" },
+                    { label: "🎙️ Mock Interview", to: "/mock-interview" },
+                    { label: "🧠 Resume Genius", to: "/resume-genius" },
+                    { label: "Logout", to: "/logout" },
+                ]}
+            />
+            <div className="max-w-7xl mx-auto">
+                <header className="mb-6">
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Mock Interview AI 🗣️</h1>
+                    <p className="text-sm text-muted-foreground mt-1">Practice structured interviews with instant feedback.</p>
+                </header>
 
-            <div className="flex flex-col md:flex-row gap-3 md:gap-4 justify-center items-center w-full">
-                        {!isInterviewActive && (
-                <button onClick={startInterview} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full md:w-auto">
-                                Start Interview
-                            </button>
-                        )}
-                        {isInterviewActive && !isProcessing && (
-                <button onClick={nextQuestion} className="bg-green-600 hover:bg-green-500 text-white font-semibold py-3 px-6 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full md:w-auto">
-                                Next Question
-                            </button>
-                        )}
-                        {isInterviewActive && isRecording && (
-                            <button onClick={() => { try { speechRecognitionRef.current?.stop?.(); } catch {} }} className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-6 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full md:w-auto">
-                                Complete Answer
-                            </button>
-                        )}
-                        {isInterviewActive && (
-                <button onClick={endInterview} className="bg-red-600 hover:bg-red-500 text-white font-semibold py-3 px-6 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full md:w-auto">
-                                End Interview
-                            </button>
-                        )}
-                        {isInterviewActive && (
-                            <div className="flex flex-wrap items-center gap-3 text-white text-sm mt-2 w-full md:w-auto justify-center">
-                                <label className="flex items-center gap-2">
-                                    <input type="checkbox" checked={micMonitorOn} onChange={(e) => setMicMonitorOn(e.target.checked)} />
-                                    Mic monitor
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <span className="opacity-70">Vol</span>
-                    <input className="w-28" type="range" min={0} max={1} step={0.05} value={micGain} onChange={(e) => setMicGain(parseFloat(e.target.value))} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left column: Video + controls */}
+                    <div className="space-y-4">
+                        <div className="glass-card rounded-2xl p-4 md:p-5">
+                            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10">
+                                <video ref={webcamVideoRef} autoPlay playsInline muted className="w-full h-full object-cover"></video>
+                                {showNoCameraMessage && !hasLiveVideo && (
+                                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-base font-medium p-4 text-center">
+                                        Webcam access denied or not available. Please allow camera access to start the interview.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="glass-card rounded-2xl p-4 md:p-5 flex flex-col md:flex-row gap-3 md:gap-4 items-center">
+                            {!isInterviewActive && (
+                                <button onClick={startInterview} className="btn btn-primary w-full md:w-auto">
+                                    Start Interview
+                                </button>
+                            )}
+                            {isInterviewActive && phase === 'feedback' && !isProcessing && (
+                                <button onClick={nextQuestion} className="btn btn-success w-full md:w-auto">
+                                    Next Question
+                                </button>
+                            )}
+                            {isInterviewActive && isRecording && (
+                                <button onClick={() => { try { speechRecognitionRef.current?.stop?.(); } catch {} }} className="btn w-full md:w-auto">
+                                    Complete Answer
+                                </button>
+                            )}
+                            {isInterviewActive && (
+                                <button onClick={endInterview} className="btn btn-danger w-full md:w-auto">
+                                    End Interview
+                                </button>
+                            )}
+
+                            {isInterviewActive && (
+                                <div className="flex flex-wrap items-center gap-3 text-sm mt-1 w-full md:w-auto justify-center">
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" checked={micMonitorOn} onChange={(e) => setMicMonitorOn(e.target.checked)} />
+                                        Mic monitor
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="opacity-70">Vol</span>
+                                        <input className="w-28" type="range" min={0} max={1} step={0.05} value={micGain} onChange={(e) => setMicGain(parseFloat(e.target.value))} />
+                                    </div>
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" checked={autoStopOnSilence} onChange={(e) => { setAutoStopOnSilence(e.target.checked); autoStopRef.current = e.target.checked; }} />
+                                        Auto‑stop on silence
+                                    </label>
+                                    <div className="w-24 h-2 bg-white/20 rounded overflow-hidden">
+                                        <div className="h-2 bg-emerald-400 rounded" style={{ width: `${inputLevel}%` }} />
+                                    </div>
+                                    <button onClick={calibrateMic} className="ml-2 px-3 py-1.5 rounded-full border border-white/20 bg-white/10 hover:bg-white/20">Calibrate mic</button>
                                 </div>
-                                <label className="flex items-center gap-2">
-                                    <input type="checkbox" checked={autoStopOnSilence} onChange={(e) => { setAutoStopOnSilence(e.target.checked); autoStopRef.current = e.target.checked; }} />
-                                    Auto‑stop on silence
-                                </label>
-                <div className="w-24 h-2 bg-white/20 rounded overflow-hidden">
-                                    <div className="h-2 bg-emerald-400 rounded" style={{ width: `${inputLevel}%` }} />
+                            )}
+                        </div>
+
+                        <div className="text-center text-muted-foreground text-sm">{statusMessage}</div>
+                    </div>
+
+                    {/* Right column: Q/A/Feedback */}
+                    <div className="space-y-4">
+                        <div className="glass-card rounded-2xl p-5">
+                            <h2 className="text-lg font-semibold mb-2">Interviewer’s Question</h2>
+                            <div className="min-h-[96px]">{questionDisplay}</div>
+                        </div>
+
+                        <div className="glass-card rounded-2xl p-5">
+                            <h2 className="text-lg font-semibold mb-2">Your Response</h2>
+                            <div className="italic text-muted-foreground min-h-[96px]">{userResponse}</div>
+                            {isRecording && (
+                                <div className="text-blue-400 text-sm mt-3 font-medium flex items-center gap-2">
+                                    <span className="animate-pulse">●</span> Recording...
                                 </div>
-                                <button onClick={calibrateMic} className="ml-2 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full border border-white/20">Calibrate mic</button>
-                            </div>
-                        )}
-                    </div>
-                    <div className="text-center text-gray-300 text-sm mt-2">{statusMessage}</div>
-                </div>
-
-                <div className="w-full md:w-1/2 flex flex-col gap-6">
-                    <div className="p-6 rounded-3xl bg-gray-700/30 backdrop-blur-lg border border-white/20 shadow-lg">
-                        <h2 className="text-xl font-semibold text-white mb-3">Interviewer's Question:</h2>
-                        <div className="text-white text-lg min-h-[100px] overflow-y-auto">
-                            {questionDisplay}
+                            )}
+                            {isProcessing && (
+                                <div className="flex items-center gap-2 text-muted-foreground text-sm mt-3">
+                                    <div className="loading-spinner"></div>
+                                    <span>Processing your answer...</span>
+                                </div>
+                            )}
                         </div>
-                    </div>
 
-                    <div className="p-6 rounded-3xl bg-gray-700/30 backdrop-blur-lg border border-white/20 shadow-lg">
-                        <h2 className="text-xl font-semibold text-white mb-3">Your Response:</h2>
-                        <div className="text-gray-300 italic min-h-[100px] overflow-y-auto">
-                            {userResponse}
+                        <div className="glass-card rounded-2xl p-5">
+                            <h2 className="text-lg font-semibold mb-2">AI Feedback</h2>
+                            <div className="min-h-[96px]">{aiFeedback}</div>
                         </div>
-                        {isRecording && (
-                            <div className="text-blue-400 text-sm mt-3 font-medium flex items-center gap-2">
-                                <span className="animate-pulse">●</span> Recording...
-                            </div>
-                        )}
-                        {isProcessing && (
-                            <div className="flex items-center gap-2 text-gray-400 text-sm mt-3">
-                                <div className="loading-spinner"></div>
-                                <span>Processing your answer...</span>
-                            </div>
-                        )}
-                    </div>
 
-                    <div className="p-6 rounded-3xl bg-gray-700/30 backdrop-blur-lg border border-white/20 shadow-lg">
-                        <h2 className="text-xl font-semibold text-white mb-3">AI Feedback:</h2>
-                        <div className="text-gray-200 min-h-[100px] overflow-y-auto">
-                            {aiFeedback}
-                        </div>
-                    </div>
-
-                    <div className="p-6 rounded-3xl bg-gray-700/30 backdrop-blur-lg border border-white/20 shadow-lg">
-                        <h2 className="text-xl font-semibold text-white mb-3">Body Language Feedback (Simulated):</h2>
-                        <div className="text-gray-200 min-h-[100px] overflow-y-auto">
-                            {bodyLanguageFeedback}
+                        <div className="glass-card rounded-2xl p-5">
+                            <h2 className="text-lg font-semibold mb-2">Body Language Feedback (Simulated)</h2>
+                            <div className="min-h-[96px]">{bodyLanguageFeedback}</div>
                         </div>
                     </div>
                 </div>
             </div>
-            {/* Additional CSS for the spinner can be added in your global CSS file */}
         </div>
     );
 };

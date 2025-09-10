@@ -23,7 +23,12 @@ HEADERS = {
 # Shared session with simple retries (network resilience) and polite timeouts.
 _session = requests.Session()
 # Slightly higher retries for flaky datacenter IPs; keep small to respect time budget
-_retries = Retry(total=2, backoff_factor=0.4, status_forcelist=[429,500,502,503,504], allowed_methods=["GET"])  # type: ignore
+_retries = Retry(
+    total=3,
+    backoff_factor=0.6,  # gentle exponential backoff
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"],  # type: ignore
+)
 _session.mount("https://", HTTPAdapter(max_retries=_retries))
 _session.headers.update(HEADERS)
 
@@ -165,7 +170,7 @@ def _fetch_detail_page(url: str) -> Dict[str, str]:
     """
     out: Dict[str, str] = {}
     try:
-        r = _session.get(url, timeout=10)
+        r = _session.get(url, timeout=14)
         r.raise_for_status()
         soup = BeautifulSoup(r.content, "html.parser")
 
@@ -209,10 +214,12 @@ def _candidate_urls(enhanced_query: str, location: Optional[str]) -> List[str]:
     urls.append(base_kw + cat)
     if location:
         urls.append(f"{base_kw}/in-{'-'.join(location.strip().split())}" + cat)
-    # Pagination page-1 variants as a last resort
+    # Pagination variants as a last resort (page-1 and page-2)
     urls.append(base_kw + "/page-1")
+    urls.append(base_kw + "/page-2")
     if location:
         urls.append(f"{base_kw}/in-{'-'.join(location.strip().split())}/page-1")
+        urls.append(f"{base_kw}/in-{'-'.join(location.strip().split())}/page-2")
     return urls
 
 def fetch_internships(query: str, location: Optional[str] = None, limit: int = 12) -> List[Dict]:
@@ -231,7 +238,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
     used_url = None
     for u in urls:
         try:
-            resp = _session.get(u, timeout=10)
+            resp = _session.get(u, timeout=12)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.content, "html.parser")
             cards = soup.select("div.container-fluid.individual_internship")
@@ -246,7 +253,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         return []
     items: List[Dict] = []
 
-    for idx, card in enumerate(cards[:limit*2]):  # Fetch more initially to filter better
+    for idx, card in enumerate(cards[:limit*3]):  # Fetch more initially to filter better
         title_tag = card.select_one("h3 a")
         title = title_tag.get_text(strip=True) if title_tag else "Internship"
 
@@ -285,7 +292,7 @@ def fetch_internships(query: str, location: Optional[str] = None, limit: int = 1
         tech_score = _calculate_tech_relevance_score(title, full_desc, skills_required)
 
         # Filter out low-relevance jobs; keep threshold modest on prod infra
-        if tech_score < 15:
+        if tech_score < 12:
             continue
 
         # Merge tags with auto-detected ones

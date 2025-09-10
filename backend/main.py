@@ -554,21 +554,23 @@ def search_internships(req: SearchRequest):
     if debug_scrapers:
         print(f"[scrape] starting queries={len(queries)} -> {list(queries)[:6]}")
     # Keep responsiveness but allow tuning for more coverage via env vars
-    # SEARCH_MAX_QUERIES: how many distinct query variants to dispatch (default 8)
-    # SEARCH_TIME_BUDGET: overall seconds to wait for results (default 8.0)
-    max_queries = int(os.getenv("SEARCH_MAX_QUERIES", "8"))
-    time_budget_s = float(os.getenv("SEARCH_TIME_BUDGET", "8.0"))
+    # SEARCH_MAX_QUERIES: how many distinct query variants to dispatch (default 10)
+    # SEARCH_TIME_BUDGET: overall seconds to wait for results (default 14.0)
+    max_queries = int(os.getenv("SEARCH_MAX_QUERIES", "10"))
+    time_budget_s = float(os.getenv("SEARCH_TIME_BUDGET", "14.0"))
     import time
     start_time = time.time()
     limited = list(queries)[:max_queries]
-    per_query_limit = int(os.getenv("SEARCH_PER_QUERY_LIMIT", "14"))
-    executor = ThreadPoolExecutor(max_workers=6)
+    per_query_limit = int(os.getenv("SEARCH_PER_QUERY_LIMIT", "20"))
+    # Scale concurrency based on number of queries to cover more ground when needed
+    max_workers = max(6, min(12, len(limited) * 2))
+    executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
         futures = []
         for idx, q in enumerate(limited):
             futures.append(executor.submit(fetch_internships, q, location, per_query_limit))
-            # Limit LinkedIn Selenium fetch to first 2 queries to reduce heavy startup cost
-            if not DISABLE_LINKEDIN and idx < 2:
+            # Run LinkedIn for the first 3 queries (configurable via DISABLE_LINKEDIN)
+            if not DISABLE_LINKEDIN and idx < 3:
                 try:
                     linkedin_fetch = _maybe_import_linkedin()
                     futures.append(executor.submit(linkedin_fetch, q, location))

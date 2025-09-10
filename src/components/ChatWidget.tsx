@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { streamChat } from "@/services/chatStream";
 import MarkdownMessage from "./MarkdownMessage";
+import StructuredAnswer from "./chat/StructuredAnswer";
 import FAQPills from "./chat/FAQPills";
 // Removed unused Message component import to avoid name collision
 import ChatInput from "./chat/ChatInput";
@@ -44,8 +45,13 @@ export default function ChatWidget({
     {
       id: crypto.randomUUID(),
       text:
-        `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI resume & internship assistant.\n\n` +
-        `Upload your resume (left) and ask me anything—I'll tailor answers to your profile, suggest roles, and help polish your resume.`,
+        `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI Career Copilot 🚀\n\n` +
+        `Upload your resume to get tailored:\n` +
+        `✅ Top resume fixes\n` +
+        `✅ Best-fit internships\n` +
+        `✅ Mock interview practice\n` +
+        `✅ Upcoming events radar\n\n` +
+        `Ask me anything about jobs, skills, or applications!`,
       isUser: false,
       timestamp: new Date(),
     },
@@ -74,8 +80,13 @@ export default function ChatWidget({
         {
           id: crypto.randomUUID(),
           text:
-            `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI resume & internship assistant.\n\n` +
-            `Upload your resume (left) and ask me anything—I'll tailor answers to your profile, suggest roles, and help polish your resume.`,
+            `Hey ${profile?.name?.split(" ")[0] || "there"}! I’m your AI Career Copilot 🚀\n\n` +
+            `Upload your resume to get tailored:\n` +
+            `✅ Top resume fixes\n` +
+            `✅ Best-fit internships\n` +
+            `✅ Mock interview practice\n` +
+            `✅ Upcoming events radar\n\n` +
+            `Ask me anything about jobs, skills, or applications!`,
           isUser: false,
           timestamp: new Date(),
         },
@@ -202,9 +213,11 @@ export default function ChatWidget({
         </div>
 
         {messages.length <= 1 && (
-          <div className="mt-3 flex items-center gap-2 text-[12px] text-white/95">
-            <FileText className="w-4 h-4" />
-            Upload your resume on the left to unlock tailored answers.
+          <div className="mt-3 flex items-center gap-3 text-[12px] text-white/95 flex-wrap">
+            <span className="inline-flex items-center gap-1"><FileText className="w-4 h-4" /> Resume</span>
+            <span className="inline-flex items-center gap-1"><ShieldCheck className="w-4 h-4" /> Skills</span>
+            <span className="inline-flex items-center gap-1"><Sparkles className="w-4 h-4" /> Interview</span>
+            <span className="inline-flex items-center gap-1"><MessageCircle className="w-4 h-4" /> Events</span>
           </div>
         )}
       </div>
@@ -229,23 +242,37 @@ export default function ChatWidget({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
-            <div
-              className={
+            <div className={`flex items-start gap-2 ${m.isUser ? 'justify-end' : 'justify-start'}`}>
+              {!m.isUser && (
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-white/15 border border-white/25 flex items-center justify-center mt-1">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+              )}
+              <div className={
                 m.isUser
-                  ? "wm-bubble user bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] md:text-[15px] px-4 py-3 rounded-2xl shadow-lg max-w-[85%] ml-auto"
+                  ? "wm-bubble user bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[14px] md:text-[15px] px-4 py-3 rounded-2xl shadow-lg max-w-[85%]"
                   : "wm-bubble bot text-[15px] md:text-[16px] leading-relaxed px-4 py-3 rounded-2xl shadow-md max-w-[85%]"
-              }
-            >
-              <MarkdownMessage text={m.text} />
+              }>
+                {m.isUser ? (
+                  <MarkdownMessage text={m.text} />
+                ) : (
+                  <StructuredAnswer text={m.text} />
+                )}
+              </div>
             </div>
           </motion.div>
         ))}
         {isLoading && (
-          <div className="wm-bubble bot max-w-[70%] px-4 py-3 text-[14px] md:text-[15px]">
-            <div className="flex items-center gap-1 opacity-70">
-              <span className="w-2 h-2 rounded-full bg-current animate-bounce" />
-              <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.1s]" />
-              <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.2s]" />
+          <div className="flex items-start gap-2">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-white/15 border border-white/25 flex items-center justify-center mt-1">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="wm-bubble bot max-w-[70%] px-4 py-3 text-[14px] md:text-[15px]">
+              <div className="flex items-center gap-1 opacity-70">
+                <span className="w-2 h-2 rounded-full bg-current animate-bounce" />
+                <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.1s]" />
+                <span className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:.2s]" />
+              </div>
             </div>
           </div>
         )}

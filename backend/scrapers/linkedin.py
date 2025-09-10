@@ -49,17 +49,23 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
 
     internships = []
     try:
-        # Initialize the Chrome WebDriver
-        # Prefer system-installed chromedriver (provided by Docker image) and fallback to manager.
+        # Initialize the Chrome WebDriver with light retry for transient failures
         drv_path = os.getenv("CHROMEDRIVER")
-        try:
-            if drv_path and os.path.exists(drv_path):
-                service = Service(drv_path)
-            else:
-                service = Service(ChromeDriverManager().install())
-        except Exception:
-            service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
+        last_err = None
+        driver = None
+        for _ in range(2):
+            try:
+                if drv_path and os.path.exists(drv_path):
+                    service = Service(drv_path)
+                else:
+                    service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=options)
+                break
+            except Exception as e:
+                last_err = e
+                time.sleep(1.2)
+        if driver is None:
+            raise last_err or RuntimeError("Failed to initialize Chrome driver")
 
         # Build the LinkedIn job search URL with tech focus
         search_query = "%20".join(enhanced_query.strip().split()) # Encode spaces for URL
@@ -79,14 +85,14 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
 
         # Navigate to the URL
         driver.get(url)
-        time.sleep(5)  # Give the page some time to load initial content
+        time.sleep(6)  # Give the page some time to load initial content
 
         # Scroll down to load more internships.
         # LinkedIn loads results dynamically, so scrolling is necessary to fetch more.
         # Adjust the range (e.g., 2-5) based on how many results you want to try and load.
-        for _ in range(2):
+        for _ in range(3):
             driver.execute_script("window.scrollBy(0, document.body.scrollHeight);")
-            time.sleep(2) # Wait for content to load after scrolling
+            time.sleep(2.2) # Wait for content to load after scrolling
 
         # Get the page source after dynamic content has loaded
         soup = BeautifulSoup(driver.page_source, "html.parser")

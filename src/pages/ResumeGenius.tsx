@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import TopNav from "@/components/TopNav";
 import { Upload, Download, FileText, Star, CheckCircle, XCircle, Sparkles, Brain, Target, Zap, Copy, Check, FileDown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -40,6 +41,120 @@ interface AnalysisResult {
       institution: string;
       year: string;
     }>;
+  };
+}
+
+// --- Helpers: robust JSON parsing and normalization ---
+function extractJsonFromText(text: string): any | null {
+  if (!text) return null;
+  // Prefer fenced code block ```json ... ```
+  const fence = text.match(/```json\s*([\s\S]*?)```/i);
+  if (fence) {
+    try { return JSON.parse(fence[1]); } catch {}
+  }
+  // Try parse entire text
+  try { return JSON.parse(text); } catch {}
+  // Try to extract the first well-formed JSON object by brace matching
+  const start = text.indexOf('{');
+  if (start >= 0) {
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          const candidate = text.slice(start, i + 1);
+          try { return JSON.parse(candidate); } catch {}
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function to0to100(n: any): number | undefined {
+  if (n === null || n === undefined) return undefined;
+  let v: number | undefined = undefined;
+  if (typeof n === 'number') v = n;
+  else if (typeof n === 'string') {
+    const m = n.match(/\d+(?:\.\d+)?/);
+    if (m) v = parseFloat(m[0]);
+  }
+  if (v === undefined || isNaN(v)) return undefined;
+  if (v > 1 && v <= 100) return Math.max(0, Math.min(100, v));
+  if (v <= 1) return Math.max(0, Math.min(100, v * 100));
+  // Values > 100: clamp
+  return Math.max(0, Math.min(100, v));
+}
+
+function normalizeArray(a: any, pick: (x: any) => string): string[] {
+  if (!Array.isArray(a)) return [];
+  return a.map(pick).filter(Boolean);
+}
+
+function normalizeAnalysis(raw: any): AnalysisResult {
+  // Accept alternate keys just in case
+  const ats = raw?.atsScore ?? raw?.ats_score ?? raw?.ats ?? raw?.score;
+  const exp = raw?.experienceRelevance ?? raw?.experience_relevance ?? raw?.experience ?? raw?.experienceScore;
+  let atsScore = to0to100(ats);
+  let experienceRelevance = to0to100(exp);
+
+  const matchedSkills = normalizeArray(raw?.matchedSkills ?? raw?.matched_skills, (x) => String(x || ''));
+  const missingSkills = normalizeArray(raw?.missingSkills ?? raw?.missing_skills, (x) => String(x || ''));
+  const suggestions = normalizeArray(raw?.suggestions, (x) => String(x || ''));
+
+  // Heuristic fallbacks if LLM omitted numbers
+  if (atsScore === undefined) {
+    const total = matchedSkills.length + missingSkills.length;
+    atsScore = total > 0 ? Math.round((matchedSkills.length / total) * 100) : 70;
+  }
+  // Avoid non-positive values (gamified UX): compute heuristic fallback
+  if (atsScore <= 0) {
+    const total = matchedSkills.length + missingSkills.length;
+    atsScore = total > 0 ? Math.max(30, Math.round((matchedSkills.length / Math.max(1,total)) * 100)) : 65;
+  }
+  if (experienceRelevance === undefined) {
+    // Simple fallback
+    experienceRelevance = Math.max(50, Math.min(90, (matchedSkills.length * 6)));
+  }
+  if (experienceRelevance <= 0) {
+    experienceRelevance = Math.max(45, Math.min(88, (matchedSkills.length * 6) || 60));
+  }
+
+  const projectSuggestions = Array.isArray(raw?.projectSuggestions) ? raw.projectSuggestions.map((p: any) => ({
+    title: String(p?.title || ''),
+    description: String(p?.description || ''),
+    techStack: normalizeArray(p?.techStack, (x) => String(x || '')),
+    impact: String(p?.impact || ''),
+  })) : [];
+
+  const tailoredResume = raw?.tailoredResume ? {
+    name: String(raw.tailoredResume.name || ''),
+    contact: String(raw.tailoredResume.contact || ''),
+    summary: String(raw.tailoredResume.summary || ''),
+    skills: normalizeArray(raw.tailoredResume.skills, (x) => String(x || '')),
+    experience: Array.isArray(raw.tailoredResume.experience) ? raw.tailoredResume.experience.map((e: any) => ({
+      title: String(e?.title || ''),
+      company: String(e?.company || ''),
+      duration: String(e?.duration || ''),
+      description: String(e?.description || ''),
+    })) : [],
+    education: Array.isArray(raw.tailoredResume.education) ? raw.tailoredResume.education.map((e: any) => ({
+      degree: String(e?.degree || ''),
+      institution: String(e?.institution || ''),
+      year: String(e?.year || ''),
+    })) : [],
+  } : undefined;
+
+  return {
+    atsScore,
+    matchedSkills,
+    missingSkills,
+    experienceRelevance,
+    suggestions,
+    projectSuggestions,
+    tailoredResume,
   };
 }
 
@@ -143,6 +258,8 @@ const ResumeGenius: React.FC = () => {
           }
         }
 
+        Respond ONLY with a single valid JSON object, no commentary or markdown fences.
+
         Focus on:
         1. ATS keyword matching
         2. Skills alignment
@@ -158,36 +275,26 @@ const ResumeGenius: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.7,
+            temperature: 0.5,
             maxOutputTokens: 4000,
+            responseMimeType: "application/json"
           }
         })
       });
 
-  const data = await response.json();
-  const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
-      // Extract JSON from the response - robust parsing
-      try {
-        const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const analysisResult = JSON.parse(jsonMatch[0]);
-          setAnalysis(analysisResult);
-        } else {
-          // Fallback: try to parse the entire response as JSON
-          const analysisResult = JSON.parse(generatedText);
-          setAnalysis(analysisResult);
-        }
-      } catch (parseError) {
-        console.error('JSON parsing failed:', parseError);
-        // Create a mock analysis for demo purposes
-  setAnalysis({
+      const data = await response.json();
+      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      // Extract and normalize JSON
+      const parsed = extractJsonFromText(generatedText);
+      if (parsed) {
+        setAnalysis(normalizeAnalysis(parsed));
+      } else {
+        console.error('LLM did not return parseable JSON.');
+        // Create a mock analysis for demo purposes with sane non-zero defaults
+        setAnalysis({
           atsScore: 75,
           matchedSkills: ['JavaScript', 'React', 'Node.js', 'Python'],
           missingSkills: ['Docker', 'Kubernetes', 'AWS', 'TypeScript'],
@@ -334,7 +441,15 @@ ${edu.institution} | ${edu.year}
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0b1020] via-[#111633] to-[#1a0f2e] p-4">
+    <div className="min-h-screen p-6 md:p-8">
+      <TopNav
+        actions={[
+          { label: "🏠 Home (new tab)", to: "/", newTab: true },
+          { label: "🎙️ Mock Interview", to: "/mock-interview" },
+          { label: "Dashboard", to: "/" },
+          { label: "Logout", to: "/logout" },
+        ]}
+      />
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
@@ -342,7 +457,7 @@ ${edu.institution} | ${edu.year}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl animate-ping"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto relative z-10">
+  <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-4">

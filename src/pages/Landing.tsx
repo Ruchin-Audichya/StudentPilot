@@ -23,7 +23,7 @@ export default function Landing() {
       <nav className="sticky top-0 z-30 bg-black/60 backdrop-blur border-b border-white/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-base sm:text-lg font-bold tracking-tight">
-            Where’s My Stipend<span className="align-super">®</span>
+            Find My Stipend<span className="align-super">®</span>
           </h1>
           <div className="flex flex-wrap items-center gap-3 sm:gap-5">
             <Link to="/onboarding" className="hover:text-gray-300 text-sm sm:text-base">Use The Tool</Link>
@@ -80,7 +80,7 @@ export default function Landing() {
           transition={{ duration: 1.7, ease: "easeOut" }}
           className="mt-4 text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent"
         >
-          Where’s My Stipend?
+          Find My Stipend
         </motion.h2>
         <p className="mt-3 sm:mt-4 text-gray-400 text-base sm:text-lg md:text-xl max-w-2xl mx-auto">
           Your skills. Your dreams. Your stipend—delivered.
