@@ -23,6 +23,7 @@ from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile
 from fastapi import HTTPException
 from fastapi import Request
+from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from pydantic import BaseModel
@@ -90,13 +91,15 @@ else:
         fe_norm = frontend_origin[:-1] if frontend_origin.endswith('/') else frontend_origin
         if fe_norm not in allowed_origins:
             allowed_origins.append(fe_norm)
+# CORS: allow specific list if provided; otherwise allow any HTTPS origin (no credentials)
+cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", r"^https?://.*$")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins or ["http://localhost:5173"],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=allowed_origins or ["*"],
+    allow_origin_regex=cors_origin_regex,
     allow_methods=["GET","POST","OPTIONS","HEAD"],  # include HEAD for health probes
     allow_headers=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
 )
 
 # Simple logging middleware (enabled when DEBUG_LOG=1)
@@ -841,6 +844,16 @@ def chat_with_ai(req: ChatRequest, request: Request):
     # Fallback (no AI configured): keep responses minimal, no boilerplate.
     # Provide a tiny hint only; avoid long hardcoded content.
     return {"response": "AI is not configured on the server. Add OPENROUTER_API_KEY to enable smart answers."}
+
+@app.get("/api/chat")
+def chat_get_hint():
+    # Helpful response for direct GETs in browser (avoid 405)
+    return {"ok": True, "endpoint": "/api/chat", "hint": "Send a POST with JSON: { message, session_id? }"}
+
+@app.options("/api/chat")
+def chat_options():
+    # Allow preflight without 405; CORS middleware will add necessary headers
+    return Response(status_code=204)
 
 # -----------------------------
 # Resume Upload Endpoint
