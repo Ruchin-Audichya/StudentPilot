@@ -326,6 +326,8 @@ def _dedupe(jobs: List[Dict]) -> List[Dict]:
 # AI Helper (OpenRouter)
 # -----------------------------
 import json, requests as _requests
+# Track last AI error (for diagnostics)
+_LAST_AI_ERROR: Optional[str] = None
 def _ai_enhanced_response(
     user_message: str,
     resume_text: str,
@@ -433,8 +435,23 @@ def _ai_enhanced_response(
                 logging.basicConfig(level=logging.INFO)
                 logging.error(f"OpenRouter call failed for model {model}: %s", e)
                 logging.error("Trace: %s", traceback.format_exc())
+            # Save a compact error for diagnostics
+            try:
+                import requests as __r
+                if isinstance(e, __r.exceptions.HTTPError) and getattr(e, 'response', None) is not None:
+                    body = e.response.text[:500]
+                    status = e.response.status_code
+                    _set_last_ai_error(f"HTTP {status}: {body}")
+                else:
+                    _set_last_ai_error(str(e)[:300])
+            except Exception:
+                _set_last_ai_error(str(e)[:300])
             continue
     return ""
+
+def _set_last_ai_error(msg: Optional[str]):
+    global _LAST_AI_ERROR
+    _LAST_AI_ERROR = (msg or "").strip() or None
 
 # -----------------------------
 # Google Generative Language (Gemini) lightweight proxy
@@ -491,7 +508,7 @@ def ai_test():
     if not key:
         return {"ok": False, "reason": "OPENROUTER_API_KEY not set in environment"}
     sample = _ai_enhanced_response("Return one word: ping", "", {})
-    return {"ok": bool(sample), "sample": sample or None, "model": models[:1]}
+    return {"ok": bool(sample), "sample": sample or None, "model": models[:1], "last_error": _LAST_AI_ERROR}
 
 # -----------------------------
 # Models
@@ -861,7 +878,8 @@ def chat_with_ai(req: ChatRequest, request: Request):
             )
             if ai_reply:
                 return {"response": ai_reply}
-            return {"response": "I’m having trouble reaching the AI right now. Please try again in a moment."}
+            hint = f" (diag: {_LAST_AI_ERROR})" if os.getenv("AI_DEBUG", "0") in {"1","true","yes"} and _LAST_AI_ERROR else ""
+            return {"response": f"I’m having trouble reaching the AI right now. Please try again in a moment.{hint}"}
 
         # Fallback (no AI configured): keep responses minimal, no boilerplate.
         # Provide a tiny hint only; avoid long hardcoded content.
