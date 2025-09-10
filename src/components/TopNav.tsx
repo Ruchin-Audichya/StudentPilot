@@ -1,15 +1,18 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 
 type Action = { label: string; to: string; newTab?: boolean };
 
 export default function TopNav({ actions = [] as Action[] }: { actions?: Action[] }) {
+  const [open, setOpen] = useState(false);
   return (
     <nav className="sticky top-0 z-30 bg-black/60 backdrop-blur border-b border-white/10">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
         <h1 className="text-base sm:text-lg font-bold tracking-tight">
           Find My Stipend<span className="align-super">®</span>
         </h1>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Desktop actions */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
           {actions.map((a) => (
             a.newTab ? (
               <a
@@ -28,7 +31,21 @@ export default function TopNav({ actions = [] as Action[] }: { actions?: Action[
             )
           ))}
         </div>
+        {/* Mobile menu */}
+        <div className="sm:hidden ml-auto">
+          <button onClick={() => setOpen(v => !v)} className="px-3 py-1.5 rounded-full bg-white text-black text-sm font-semibold">Menu</button>
+        </div>
       </div>
+      {open && (
+        <div className="sm:hidden px-3 pb-3">
+          <div className="rounded-2xl border border-white/10 bg-black/80 backdrop-blur p-2 grid grid-cols-2 gap-2">
+            <Link to="/mock-interview" className="wm-pill px-3 py-2 text-sm text-left">🎙️ Mock Interview</Link>
+            <Link to="/resume-genius" className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</Link>
+            <Link to="/dashboard" className="wm-pill px-3 py-2 text-sm text-left">📅 Dashboard</Link>
+            <Link to="/logout" className="wm-pill px-3 py-2 text-sm text-left">🚪 Logout</Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

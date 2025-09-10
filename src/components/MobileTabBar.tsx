@@ -29,8 +29,7 @@ export default function MobileTabBar() {
         <div className="flex items-center justify-between gap-1">
           <Item icon={Home} label="Home" to="/" />
           <Item icon={LayoutDashboard} label="Dashboard" to="/dashboard" />
-          {/* Chat routes to dashboard for now (widget lives there) */}
-          <Item icon={MessageCircle} label="Chat" to="/dashboard" />
+          <Item icon={MessageCircle} label="Chat" to="/chat" />
           <Item icon={FileText} label="Resume" to="/resume-genius" />
           <button
             onClick={() => setOpen(v => !v)}

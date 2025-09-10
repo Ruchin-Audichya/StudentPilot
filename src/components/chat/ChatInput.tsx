@@ -21,7 +21,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, disabled
   };
 
   return (
-    <div className="wm-inputbar sticky bottom-0 px-3 sm:px-4 py-3 sm:py-4">
+  <div className="wm-inputbar sticky bottom-0 px-3 sm:px-4 py-3 sm:py-4 safe-bottom">
       <div className="wm-inputwrap flex items-center gap-2 px-3 py-2">
         <Input
           ref={inputRef}

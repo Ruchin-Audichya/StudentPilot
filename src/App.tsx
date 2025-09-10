@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Landing from "@/pages/Landing";
 import MockInterview from '@/pages/MockInterview'; 
 import ResumeGenius from '@/pages/ResumeGenius';
+import Chat from '@/pages/Chat';
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
@@ -30,6 +31,12 @@ export default function App() {
         {/* Resume Genius - ATS Resume Optimizer */}
         <Route path="/resume-genius" element={<>
           <ResumeGenius />
+          {isMobile && <MobileTabBar />}
+        </>} />
+
+        {/* Chat page */}
+        <Route path="/chat" element={<>
+          <Chat />
           {isMobile && <MobileTabBar />}
         </>} />
 
