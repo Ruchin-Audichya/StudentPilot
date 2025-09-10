@@ -423,7 +423,6 @@ def _ai_enhanced_response(
             if choices:
                 content = choices[0].get("message", {}).get("content")
                 if content:
-                    import re
                     # Ensure line breaks and emojis are preserved
                     content = re.sub(r'([\n\r]+)', '\n', content)
                     content = re.sub(r'\n{2,}', '\n', content)
