@@ -20,7 +20,7 @@ export default function BackendDebug() {
     return ()=>{cancelled=true};
   }, []);
   return (
-    <div style={{fontFamily:'monospace',fontSize:12, background:'#111', color:'#bbb', padding:8, borderRadius:8, lineHeight:1.3}}>
+    <div style={{fontFamily:'monospace',fontSize:12, background:'#111', color:'#bbb', padding:8, borderRadius:8, lineHeight:1.3, overflowX:'auto', wordBreak:'break-word', whiteSpace:'pre-wrap'}}>
       <div>API_BASE = {API_BASE}</div>
       {state.error && <div style={{color:'#f55'}}>error: {state.error}</div>}
       {state.health && <div>health: {JSON.stringify(state.health)}</div>}

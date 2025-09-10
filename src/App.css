@@ -239,6 +239,10 @@ video { object-fit: cover; border-radius: 12px; }
 
 /* System font stack for legibility */
 body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+/* Prevent horizontal overflow on small screens */
+html, body, #root { max-width: 100%; overflow-x: hidden; }
+/* Wrap long URLs/strings inside chat and cards */
+.wm-bubble, .glass-card { word-break: break-word; overflow-wrap: anywhere; }
 
 /* Responsive chat height tuning */
 @media (max-width: 640px) {

@@ -288,7 +288,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-8">
+  <div className="min-h-screen p-4 md:p-8 overflow-x-hidden">
       <TopNav
         actions={[
           { label: "🎙️ Mock Interview", to: "/mock-interview" },
@@ -296,7 +296,7 @@ export default function Dashboard({ profile }: DashboardProps) {
           { label: "Logout", to: "/logout" },
         ]}
       />
-      <div className="mb-4">
+      <div className="mb-4 hidden sm:block">
         <BackendDebug />
       </div>
 
