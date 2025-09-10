@@ -9,6 +9,7 @@ function computeApiBase(): string {
   const raw: string | undefined = (import.meta as any)?.env?.VITE_API_BASE;
   const cleaned = raw?.trim();
   const isVercel = isBrowser && window.location.hostname.endsWith('vercel.app');
+  const isHostedHttps = isBrowser && window.location.protocol === 'https:' && !/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
   // Allow runtime override for debugging without rebuild
   try {
     if (isBrowser) {
@@ -18,10 +19,10 @@ function computeApiBase(): string {
       }
     }
   } catch {/* ignore */}
-  if (isVercel) {
+  if (isVercel || isHostedHttps) {
     // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
-      if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
-        return 'https://studentpilot.onrender.com';
+    if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
+      return 'https://studentpilot.onrender.com';
     }
     return cleaned.replace(/\/$/, '');
   }

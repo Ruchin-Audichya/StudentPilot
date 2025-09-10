@@ -22,26 +22,31 @@ export async function* streamChat({
   model: string;
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
+  const sid = getClientSessionId();
   const body = {
     message,
-    session_id: getClientSessionId(),
-    model: (model || "deepseek/deepseek-chat-v3-0324:free").trim()
+    model: (model || "deepseek/deepseek-chat-v3-0324:free").trim(),
+    session_id: sid,
   };
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Session-Id": body.session_id },
+      headers: { "Content-Type": "application/json", "X-Session-Id": sid },
       body: JSON.stringify(body),
       signal
     });
     if (!res.ok) {
-      yield `⚠️ Chat request failed: ${res.status}`;
+      const hint = res.status >= 500 ? "(server error)" : res.status === 404 ? "(route missing)" : res.status === 401 ? "(auth)" : "";
+      yield `⚠️ Chat request failed: ${res.status} ${hint}`;
       return;
     }
     const data = await res.json();
     let reply = data.response || data.choices?.[0]?.message?.content || "No response";
     yield sanitizeAndShapeReply(reply);
-  } catch (err) {
-    yield `⚠️ Chat request failed: ${err}`;
+  } catch (err: any) {
+    const msg = String(err?.message || err);
+    const maybeCors = msg.includes('CORS') || msg.includes('cors');
+    const maybeOffline = msg.includes('Failed to fetch') || msg.includes('NetworkError');
+    yield `⚠️ Chat request failed: ${msg}${maybeCors ? ' (CORS?)' : ''}${maybeOffline ? ' (network?)' : ''}`;
   }
 }
