@@ -7,26 +7,46 @@
 function computeApiBase(): string {
   const isBrowser = typeof window !== 'undefined';
   const raw: string | undefined = (import.meta as any)?.env?.VITE_API_BASE;
-  const cleaned = raw?.trim();
+  let cleaned = raw?.trim();
   const isVercel = isBrowser && window.location.hostname.endsWith('vercel.app');
   const isHostedHttps = isBrowser && window.location.protocol === 'https:' && !/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+
   // Allow runtime override for debugging without rebuild
   try {
     if (isBrowser) {
       const ov = localStorage.getItem('API_BASE_OVERRIDE');
-      if (ov && /^https?:\/\/\w+/i.test(ov)) {
+      if (ov && /^https?:\/\//i.test(ov)) {
         return ov.replace(/\/$/, '');
       }
     }
   } catch {/* ignore */}
+
+  // Normalize provided VITE_API_BASE (add protocol if missing)
+  if (cleaned && !/^https?:\/\//i.test(cleaned)) {
+    cleaned = `https://${cleaned}`;
+  }
+
+  // Validate URL shape
+  const isValidUrl = (val?: string) => {
+    if (!val) return false;
+    try {
+      // eslint-disable-next-line no-new
+      new URL(val);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   if (isVercel || isHostedHttps) {
     // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
-    if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned)) {
+    if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned) || !isValidUrl(cleaned)) {
       return 'https://studentpilot.onrender.com';
     }
     return cleaned.replace(/\/$/, '');
   }
-  if (cleaned) return cleaned.replace(/\/$/, '');
+
+  if (cleaned && isValidUrl(cleaned)) return cleaned.replace(/\/$/, '');
   return 'http://127.0.0.1:8000';
 }
 

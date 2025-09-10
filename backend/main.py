@@ -67,40 +67,27 @@ app = FastAPI()
 @app.get("/")
 def root():
     return {"app": "StudentPilot API", "health": "/health", "endpoints": ["/api/search", "/api/upload-resume", "/api/chat"], "status": "ok"}
-# Explicit CORS origins (override with CORS_ORIGINS env var comma separated)
-_default_origins = (
-    "http://localhost:5173,https://wms-virid-six.vercel.app,"
-    "http://localhost:8080,http://127.0.0.1:8080,http://127.0.0.1:5173,"
-    "http://wheresmystipend-env-1.eba-bdf4swct.ap-south-1.elasticbeanstalk.com"
-)
+# CORS: default to permissive for public API usage; can be restricted via env if needed.
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
-# Normalize trailing slash early so single-origin mode matches browser Origin header
-if frontend_origin.endswith('/'):
-    frontend_origin = frontend_origin[:-1]
-if frontend_origin and not _cors_env:
-    allowed_origins = [frontend_origin]
+if _cors_env:
+    # Respect explicit origins when provided (comma-separated)
+    allowed_origins = [o.strip().rstrip('/') for o in _cors_env.split(',') if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
 else:
-    # fallback to default list if custom not provided
-    origins_raw = _cors_env or _default_origins
-    allowed_origins = [o.strip() for o in origins_raw.split(",") if o.strip()]
-    # Normalize (strip trailing slashes) so a value like https://example.com/ still matches browser Origin header
-    allowed_origins = [o[:-1] if o.endswith('/') else o for o in allowed_origins]
-    if frontend_origin and frontend_origin not in allowed_origins:
-        # Ensure normalized as well
-        fe_norm = frontend_origin[:-1] if frontend_origin.endswith('/') else frontend_origin
-        if fe_norm not in allowed_origins:
-            allowed_origins.append(fe_norm)
-# CORS: allow specific list if provided; otherwise allow any HTTPS origin (no credentials)
-cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", r"^https?://.*$")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins or ["*"],
-    allow_origin_regex=cors_origin_regex,
-    allow_methods=["GET","POST","OPTIONS","HEAD"],  # include HEAD for health probes
-    allow_headers=["*"],
-    allow_credentials=False,
-)
+    # Fully open CORS (no credentials) to avoid preflight issues with custom headers like X-Session-Id
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
 
 # Simple logging middleware (enabled when DEBUG_LOG=1)
 if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
