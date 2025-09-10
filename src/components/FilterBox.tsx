@@ -48,6 +48,7 @@ const FilterBox: React.FC<Props> = ({
   const [showMoreInterests, setShowMoreInterests] = React.useState(false);
   const [skillsQuery, setSkillsQuery] = React.useState("");
   const [interestsQuery, setInterestsQuery] = React.useState("");
+  const [openMobile, setOpenMobile] = React.useState(false);
 
   const filteredSkillsOptions = React.useMemo(() => {
     const q = skillsQuery.trim().toLowerCase();
@@ -65,7 +66,7 @@ const FilterBox: React.FC<Props> = ({
     <div className="glass-card rounded-3xl p-5 md:p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up hover-lift">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Filters</h2>
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
           <button onClick={onSearch} disabled={loading} className={`btn btn-success hover-lift ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}>
             {loading ? (
               <span className="inline-flex items-center gap-2">
@@ -85,10 +86,10 @@ const FilterBox: React.FC<Props> = ({
         {" · "}Location: {location || "—"}
       </div>
 
-      <Accordion type="single" collapsible defaultValue="open" className="mt-3">
+      <Accordion type="single" collapsible defaultValue={openMobile ? 'open' : undefined} className="mt-3 sm:mt-3">
         <AccordionItem value="open" className="border-none">
-          <AccordionTrigger className="rounded-xl px-3 py-2 bg-white/5 border border-card-border">
-            Adjust filters
+          <AccordionTrigger onClick={() => setOpenMobile(v => !v)} className="rounded-xl px-3 py-2 bg-white/5 border border-card-border sm:cursor-default">
+            {openMobile ? 'Hide filters' : 'Adjust filters'}
           </AccordionTrigger>
           <AccordionContent>
             {/* Quick toggles: compact + calm */}
@@ -243,6 +244,18 @@ const FilterBox: React.FC<Props> = ({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+      {/* Sticky mobile Search button above tab bar */}
+      <div className="sm:hidden sticky bottom-[64px] left-0 right-0 z-40 mt-3">
+        <div className="px-2">
+          <button
+            onClick={onSearch}
+            disabled={loading}
+            className={`w-full btn btn-success safe-bottom ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+          >
+            {loading ? 'Searching…' : 'Search'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

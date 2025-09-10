@@ -8,18 +8,30 @@ import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
 import AuthPage from "@/pages/AuthPage"; // <-- Added
+import MobileTabBar from "@/components/MobileTabBar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function App() {
+  const isMobile = useIsMobile();
   return (
     <Router>
       <Routes>
         {/* Landing page */}
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<>
+          <Landing />
+          {isMobile && <MobileTabBar />}
+        </>} />
 
-        <Route path="/mock-interview" element={<MockInterview />} />
+        <Route path="/mock-interview" element={<>
+          <MockInterview />
+          {isMobile && <MobileTabBar />}
+        </>} />
 
         {/* Resume Genius - ATS Resume Optimizer */}
-        <Route path="/resume-genius" element={<ResumeGenius />} />
+        <Route path="/resume-genius" element={<>
+          <ResumeGenius />
+          {isMobile && <MobileTabBar />}
+        </>} />
 
         {/* Auth page */}
         <Route path="/auth" element={<AuthPage />} />
@@ -28,7 +40,10 @@ export default function App() {
         <Route path="/onboarding" element={<Onboarding />} />
 
         {/* Main dashboard */}
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard" element={<>
+          <Dashboard />
+          {isMobile && <MobileTabBar />}
+        </>} />
 
         {/* Logout page */}
         <Route path="/logout" element={<Logout />} />
