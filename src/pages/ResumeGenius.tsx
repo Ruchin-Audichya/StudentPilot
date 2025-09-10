@@ -211,11 +211,7 @@ const ResumeGenius: React.FC = () => {
 
     setIsAnalyzing(true);
     try {
-      if (!API_KEY) {
-        console.warn('Missing VITE_GEMINI_API_KEY. Configure your Gemini key to enable AI analysis.');
-        setIsAnalyzing(false);
-        return;
-      }
+  // If no browser key, we'll fallback to backend proxy
       const text = resumeText || (file ? await extractTextFromFile(file) : '');
       setResumeText(text);
       const prompt = `
@@ -276,18 +272,19 @@ const ResumeGenius: React.FC = () => {
         6. Complete tailored resume generation
       `;
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${API_KEY}`, {
+  const useProxy = !API_KEY;
+  const response = await fetch(useProxy ? `${API_BASE}/api/gemini/generate` : `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
+        body: JSON.stringify(useProxy ? {
+          model: TEXT_MODEL,
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.5,
-            maxOutputTokens: 4000,
-            responseMimeType: "application/json"
-          }
+          generationConfig: { temperature: 0.5, maxOutputTokens: 4000, responseMimeType: "application/json" }
+        } : {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.5, maxOutputTokens: 4000, responseMimeType: "application/json" }
         })
       });
 
@@ -363,10 +360,14 @@ ${text}
 
 Return ONLY a clean Markdown-formatted resume with sections: Name and Contact, Professional Summary, Skills (grouped), Experience (with bullet points and metrics), Projects (optional), Education, Certifications (optional).`;
 
-  const rewriteResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${API_KEY}`, {
+  const rewriteResp = await fetch(useProxy ? `${API_BASE}/api/gemini/generate` : `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify(useProxy ? {
+            model: TEXT_MODEL,
+            contents: [{ parts: [{ text: rewritePrompt }] }],
+            generationConfig: { temperature: 0.6, maxOutputTokens: 5000 }
+          } : {
             contents: [{ parts: [{ text: rewritePrompt }] }],
             generationConfig: { temperature: 0.6, maxOutputTokens: 5000 }
           })

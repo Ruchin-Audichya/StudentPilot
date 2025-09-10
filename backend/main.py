@@ -21,6 +21,8 @@ except Exception:
 import docx
 from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile
+from fastapi import HTTPException
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from pydantic import BaseModel
@@ -356,6 +358,54 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) ->
                 logging.error("Trace: %s", traceback.format_exc())
             continue
     return ""
+
+# -----------------------------
+# Google Generative Language (Gemini) lightweight proxy
+# -----------------------------
+def _gemini_generate_content(model: str, payload: Dict) -> Dict:
+    """Server-side call to Google Generative Language API using GOOGLE_API_KEY.
+
+    This avoids exposing the key to the browser and allows frontend fallback when Vite env is missing.
+    Returns raw JSON from Google API.
+    """
+    key = GOOGLE_API_KEY
+    if not key:
+        raise HTTPException(status_code=400, detail="GOOGLE_API_KEY not set on backend")
+    model = (model or "gemini-2.5-flash").strip()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+    try:
+        resp = _requests.post(url, json=payload, timeout=40)
+        if resp.status_code == 429:
+            # Light backoff retry once for rate limits
+            import time
+            time.sleep(1.0)
+            resp = _requests.post(url, json=payload, timeout=40)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini proxy failed: {e}")
+
+@app.post("/api/gemini/generate")
+async def gemini_generate(request: Request):
+    """Generic proxy for Gemini generateContent.
+
+    Body example (mirrors Google API):
+    {
+      "model": "gemini-2.5-flash",
+      "contents": [...],
+      "generationConfig": {...},
+      "safetySettings": {...}
+    }
+    """
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    model = data.get("model") or "gemini-2.5-flash"
+    # Forward entire body except 'model' (Google expects model in path)
+    forward_payload = data.copy()
+    forward_payload.pop("model", None)
+    result = _gemini_generate_content(model, forward_payload)
+    return result
 
 @app.get("/api/ai-test")
 def ai_test():

@@ -20,3 +20,6 @@ services:
         value: "https://studentpilot.vercel.app"
       - key: OPENROUTER_MODELS
         value: "deepseek/deepseek-chat-v3-0324:free"
+      - key: GOOGLE_API_KEY
+        sync: false
+        value: ""

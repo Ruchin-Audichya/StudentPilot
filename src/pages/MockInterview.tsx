@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TopNav from "@/components/TopNav";
+import { API_BASE } from "@/lib/apiBase";
 
 declare global {
     interface Window {
@@ -172,11 +173,7 @@ const MockInterview = () => {
     // Function to speak the question using Gemini TTS
     const speakQuestion = useCallback(async (questionText) => {
         if (!isInterviewActiveRef.current) return; // Guard against stray calls
-        if (!API_KEY) {
-            setStatusMessage("TTS unavailable (missing Gemini key). Showing text only.");
-            setQuestionDisplay(questionText);
-            return;
-        }
+    // We can fallback to backend proxy if no browser key
         setStatusMessage("Interviewer speaking...");
         // Slight variety in prosody: optional preface and small pre-silence
         const prefaces = ["Okay.", "Alright.", "Got it.", "Thanks."];
@@ -197,14 +194,17 @@ const MockInterview = () => {
             },
         };
 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${API_KEY}`;
+        const useProxy = !API_KEY;
+        const apiUrl = useProxy
+            ? `${API_BASE}/api/gemini/generate`
+            : `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${API_KEY}`;
 
         try {
             try { await audioContextRef.current?.resume?.(); } catch {}
             const response = await fetchWithBackoff(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(useProxy ? { model: TTS_MODEL, ...payload } : payload)
             });
 
             const result = await response.json();
@@ -295,10 +295,7 @@ const MockInterview = () => {
 
     // Function to get AI feedback on user's response
     const getAIResponse = useCallback(async (question, userAnswer) => {
-        if (!API_KEY) {
-            setAiFeedback("AI feedback unavailable (missing Gemini key). Configure VITE_GEMINI_API_KEY.");
-            return;
-        }
+    const useProxy = !API_KEY;
         setIsProcessing(true);
         const chatHistory = [];
         chatHistory.push({
@@ -314,13 +311,15 @@ const MockInterview = () => {
         });
 
         const payload = { contents: chatHistory };
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_GENERATION_MODEL}:generateContent?key=${API_KEY}`;
+        const apiUrl = useProxy
+            ? `${API_BASE}/api/gemini/generate`
+            : `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_GENERATION_MODEL}:generateContent?key=${API_KEY}`;
 
         try {
             const response = await fetchWithBackoff(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(useProxy ? { model: TEXT_GENERATION_MODEL, ...payload } : payload)
             });
             const result = await response.json();
             if (result.candidates && result.candidates.length > 0 &&
