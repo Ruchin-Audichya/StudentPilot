@@ -326,7 +326,14 @@ def _dedupe(jobs: List[Dict]) -> List[Dict]:
 # AI Helper (OpenRouter)
 # -----------------------------
 import json, requests as _requests
-def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict, preferred_model: Optional[str] = None) -> str:
+def _ai_enhanced_response(
+    user_message: str,
+    resume_text: str,
+    profile: Dict,
+    preferred_model: Optional[str] = None,
+    referer_override: Optional[str] = None,
+    site_name_override: Optional[str] = None,
+) -> str:
     key, models, base, site_url, site_name = _openrouter_config()
     if not key or not user_message.strip():
         return ""
@@ -335,6 +342,11 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict, pr
         pm = preferred_model.strip()
         if pm and pm not in models:
             models = [pm] + models
+    # Use runtime overrides from the current request when available
+    if referer_override:
+        site_url = referer_override.strip() or site_url
+    if site_name_override:
+        site_name = site_name_override.strip() or site_name
     system_prompt = (
         "You are StudentPilot—an internship and resume mentor. Be concrete, kind, and helpful.\n"
         "STYLE:\n"
@@ -396,6 +408,7 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict, pr
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
             "HTTP-Referer": site_url,
             "X-Title": site_name,
         }
@@ -836,7 +849,16 @@ def chat_with_ai(req: ChatRequest, request: Request):
         # If OpenRouter is configured and not in OFFLINE_MODE, always return ONLY the AI's reply
         ai_enabled = (os.getenv("OFFLINE_MODE", "0").lower() not in {"1","true","yes","on"}) and bool(_openrouter_config()[0])
         if ai_enabled:
-            ai_reply = _ai_enhanced_response(msg, active_text, active_profile, preferred_model=req.model)
+            # Use request headers as referer hint if present (helps OpenRouter attribution)
+            referer = request.headers.get("origin") or request.headers.get("referer") or None
+            ai_reply = _ai_enhanced_response(
+                msg,
+                active_text,
+                active_profile,
+                preferred_model=req.model,
+                referer_override=referer,
+                site_name_override=os.getenv("OPENROUTER_SITE_NAME", None),
+            )
             if ai_reply:
                 return {"response": ai_reply}
             return {"response": "I’m having trouble reaching the AI right now. Please try again in a moment."}
