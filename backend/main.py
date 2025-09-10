@@ -49,10 +49,17 @@ def _maybe_import_linkedin():
 def _openrouter_config():
     """Fetch OpenRouter-related env vars dynamically so key changes don't require process restart."""
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    models = [m.strip() for m in os.getenv("OPENROUTER_MODELS", "deepseek/deepseek-chat-v3-0324:free").split(",") if m.strip()]
+    # Sensible defaults with a few free fallbacks (first wins). Can be overridden via OPENROUTER_MODELS.
+    default_models = "deepseek/deepseek-chat-v3-0324:free,deepseek/deepseek-chat:free,meta-llama/llama-3.1-8b-instruct:free,gryphe/mythomax-l2-13b:free"
+    models = [m.strip() for m in os.getenv("OPENROUTER_MODELS", default_models).split(",") if m.strip()]
     base = os.getenv("OPENROUTER_BASE", "https://openrouter.ai/api/v1/chat/completions").strip()
-    site_url = os.getenv("OPENROUTER_SITE_URL", "https://example.com").strip() or "https://example.com"
-    site_name = os.getenv("OPENROUTER_SITE_NAME", "Career Copilot").strip() or "Career Copilot"
+    # Prefer configured frontend origin so HTTP-Referer is a real site; fallback to Render URL.
+    site_url = (
+        os.getenv("OPENROUTER_SITE_URL", "").strip()
+        or os.getenv("FRONTEND_ORIGIN", "").strip()
+        or "https://studentpilot.onrender.com"
+    )
+    site_name = os.getenv("OPENROUTER_SITE_NAME", "StudentPilot").strip() or "StudentPilot"
     return key, models, base, site_url, site_name
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()  # (Future fallback)
 
@@ -319,10 +326,15 @@ def _dedupe(jobs: List[Dict]) -> List[Dict]:
 # AI Helper (OpenRouter)
 # -----------------------------
 import json, requests as _requests
-def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) -> str:
+def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict, preferred_model: Optional[str] = None) -> str:
     key, models, base, site_url, site_name = _openrouter_config()
     if not key or not user_message.strip():
         return ""
+    # If client provided a model, try it first
+    if preferred_model:
+        pm = preferred_model.strip()
+        if pm and pm not in models:
+            models = [pm] + models
     system_prompt = (
         "You are StudentPilot—an internship and resume mentor. Be concrete, kind, and helpful.\n"
         "STYLE:\n"
@@ -493,6 +505,7 @@ class Internship(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    model: Optional[str] = None
 
 class UserLog(BaseModel):
     uid: str
@@ -823,7 +836,7 @@ def chat_with_ai(req: ChatRequest, request: Request):
         # If OpenRouter is configured and not in OFFLINE_MODE, always return ONLY the AI's reply
         ai_enabled = (os.getenv("OFFLINE_MODE", "0").lower() not in {"1","true","yes","on"}) and bool(_openrouter_config()[0])
         if ai_enabled:
-            ai_reply = _ai_enhanced_response(msg, active_text, active_profile)
+            ai_reply = _ai_enhanced_response(msg, active_text, active_profile, preferred_model=req.model)
             if ai_reply:
                 return {"response": ai_reply}
             return {"response": "I’m having trouble reaching the AI right now. Please try again in a moment."}
