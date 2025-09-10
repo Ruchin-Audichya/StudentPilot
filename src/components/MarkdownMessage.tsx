@@ -6,7 +6,7 @@ import "@/styles/markdown.css";
 export default function MarkdownMessage({ text }: { text: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+  remarkPlugins={[remarkGfm]}
       components={{
         a: (props) => (
           <a {...props} target="_blank" rel="noopener noreferrer" />

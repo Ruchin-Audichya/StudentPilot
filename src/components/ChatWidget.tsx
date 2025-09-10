@@ -17,6 +17,7 @@ import FAQPills from "./chat/FAQPills";
 import ChatInput from "./chat/ChatInput";
 import { FREE_MODELS } from "@/constants/models";
 import ResumeBadge from "./chat/ResumeBadge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ChatMessage {
   id: string;
@@ -231,10 +232,12 @@ export default function ChatWidget({
       </div>
 
       {/* FEED — glass bubbles */}
-      <div
-        ref={scrollerRef}
-        className="wm-feed chat-scrollbar flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3"
-      >
+      <ScrollArea className="flex-1 px-3 sm:px-4 py-3 sm:py-4">
+        <div
+          ref={scrollerRef}
+          className="wm-feed chat-scrollbar space-y-3 [overscroll-behavior:contain]"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
         {messages.map((m) => (
           <motion.div
             key={m.id}
@@ -276,7 +279,8 @@ export default function ChatWidget({
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </ScrollArea>
 
       {/* INPUT — glass pill + circular gradient send (text always visible) */}
       <ChatInput
