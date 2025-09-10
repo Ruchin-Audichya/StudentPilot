@@ -83,11 +83,13 @@ export async function chatWithAssistant(
   selectedModel?: string,
   opts?: { signal?: AbortSignal; idToken?: string }
 ): Promise<string> {
+  const sid = (()=>{ try{ return localStorage.getItem('wm.session.v1') || (localStorage.setItem('wm.session.v1', crypto.randomUUID()), localStorage.getItem('wm.session.v1')); } catch { return null; } })();
   const body = {
     message,
-  model: (selectedModel || "deepseek/deepseek-chat-v3-0324:free").trim()
+    session_id: sid || undefined,
+    model: (selectedModel || "deepseek/deepseek-chat-v3-0324:free").trim()
   };
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...(sid ? { 'X-Session-Id': sid } : {}) };
   if (opts?.idToken) headers["id_token"] = opts.idToken;
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
@@ -110,11 +112,13 @@ export async function chatCompletion({ message, selectedModel, idToken }: {
   selectedModel?: string;
   idToken?: string;
 }) {
+  const sid = (()=>{ try{ return localStorage.getItem('wm.session.v1') || (localStorage.setItem('wm.session.v1', crypto.randomUUID()), localStorage.getItem('wm.session.v1')); } catch { return null; } })();
   const body = {
     message,
-  model: (selectedModel || "deepseek/deepseek-chat-v3-0324:free").trim()
+    session_id: sid || undefined,
+    model: (selectedModel || "deepseek/deepseek-chat-v3-0324:free").trim()
   };
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...(sid ? { 'X-Session-Id': sid } : {}) };
   if (idToken) headers["id_token"] = idToken;
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {

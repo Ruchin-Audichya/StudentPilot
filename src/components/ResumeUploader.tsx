@@ -25,9 +25,11 @@ export default function ResumeUploader({ onUploaded }: Props) {
 
     const form = new FormData();
     form.append("file", file);
+  const sid = (()=>{ try{ return localStorage.getItem('wm.session.v1') || (localStorage.setItem('wm.session.v1', crypto.randomUUID()), localStorage.getItem('wm.session.v1')); } catch { return null; } })();
   const res = await fetch(API_BASE + "/api/upload-resume", {
       method: "POST",
       body: form,
+      headers: sid ? { 'X-Session-Id': sid } : undefined,
     });
     const data = await res.json();
     setUploading(false);

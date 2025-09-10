@@ -191,7 +191,8 @@ const ResumeGenius: React.FC = () => {
     try {
       const form = new FormData();
       form.append('file', file);
-      const r = await fetch(`${API_BASE}/api/upload-resume`, { method: 'POST', body: form });
+      const sid = (()=>{ try{ return localStorage.getItem('wm.session.v1') || (localStorage.setItem('wm.session.v1', crypto.randomUUID()), localStorage.getItem('wm.session.v1')); } catch { return null; } })();
+      const r = await fetch(`${API_BASE}/api/upload-resume`, { method: 'POST', body: form, headers: sid ? { 'X-Session-Id': sid } : undefined });
       if (r.ok) {
         const data = await r.json();
         const txt = (data?.sample_text as string) || '';

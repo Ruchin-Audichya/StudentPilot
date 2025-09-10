@@ -23,10 +23,25 @@ export interface JobSearchParams {
 
 import { API_BASE } from "../lib/apiBase";
 
+function getClientSessionId(): string | null {
+  try {
+    const key = "wm.session.v1";
+    let sid = localStorage.getItem(key);
+    if (!sid) {
+      sid = crypto.randomUUID();
+      localStorage.setItem(key, sid);
+    }
+    return sid;
+  } catch {
+    return null;
+  }
+}
+
 export async function searchInternships(params: JobSearchParams): Promise<JobResult[]> {
+  const sid = getClientSessionId();
   const res = await fetch(`${API_BASE}/api/search`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(sid ? { "X-Session-Id": sid } : {}) },
     body: JSON.stringify({
   // Use a soft query; backend will fallback to resume keywords if needed
   query: [...params.skills, ...params.interests].filter(Boolean).slice(0, 6).join(" ") || "",

@@ -131,8 +131,43 @@ def version_info():
         "openrouter": bool(os.getenv("OPENROUTER_API_KEY", "").strip()),
     }
 
+@app.post("/api/session")
+def create_session(request: Request):
+    """Issue a random session id for clients that prefer server-generated IDs.
+
+    Frontend may also generate its own UUID and just send it in X-Session-Id; this endpoint is optional.
+    """
+    import uuid
+    sid = uuid.uuid4().hex
+    _sessions.setdefault(sid, {"resume_text": "", "resume_profile": {"skills": set(), "roles": set(), "location": None}})
+    return {"session_id": sid}
+
+# Legacy globals (kept for backward-compat and local single-user dev)
 resume_text = ""
 resume_profile = {"skills": set(), "roles": set(), "location": None}
+
+# Per-session store to prevent cross-user leakage. Keys are arbitrary session IDs provided by the client.
+# This avoids global sharing of resume context across users.
+_sessions: Dict[str, Dict] = {}
+
+def _get_session_id(request: Request) -> Optional[str]:
+    # Prefer explicit header; tolerate common variants
+    sid = request.headers.get("x-session-id") or request.headers.get("X-Session-Id")
+    if sid:
+        sid = sid.strip()
+    return sid or None
+
+def _get_session_profile(session_id: Optional[str]):
+    """Return (resume_text, resume_profile_dict) for given session id.
+
+    If session_id is None or not found, return empty defaults to avoid leakage.
+    """
+    if not session_id:
+        return "", {"skills": set(), "roles": set(), "location": None}
+    entry = _sessions.get(session_id)
+    if not entry:
+        return "", {"skills": set(), "roles": set(), "location": None}
+    return entry.get("resume_text", ""), entry.get("resume_profile", {"skills": set(), "roles": set(), "location": None})
 buzzword_skills = set()
 buzzword_roles = set()
 
@@ -440,6 +475,7 @@ class Internship(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
 
 class UserLog(BaseModel):
     uid: str
@@ -460,12 +496,17 @@ def log_user(evt: UserLog):
 
 # Simple status endpoint for frontend to detect resume/session profile
 @app.get("/api/resume-status")
-def resume_status():
+def resume_status(request: Request):
+    sid = _get_session_id(request)
+    sess_text, sess_profile = _get_session_profile(sid)
+    # Backward compat for old clients not sending session-id: expose legacy global in that case
+    use_text = sess_text or ("" if sid else resume_text)
+    use_profile = sess_profile if sess_text or sid else resume_profile
     return {
-        "has_resume": bool(resume_text),
-        "skills": sorted(list(resume_profile.get("skills", [])))[:12],
-        "roles": sorted(list(resume_profile.get("roles", [])))[:6],
-        "location": resume_profile.get("location"),
+        "has_resume": bool(use_text),
+        "skills": sorted(list(use_profile.get("skills", [])))[:12],
+        "roles": sorted(list(use_profile.get("roles", [])))[:6],
+        "location": use_profile.get("location"),
     }
 
 @app.get("/api/diagnostics")
@@ -497,8 +538,12 @@ def diagnostics():
 # Search Endpoint
 # -----------------------------
 @app.post("/api/search", response_model=List[Internship])
-def search_internships(req: SearchRequest):
+def search_internships(req: SearchRequest, request: Request):
     global resume_text, resume_profile
+    sid = _get_session_id(request)
+    sess_text, sess_profile = _get_session_profile(sid)
+    active_text = sess_text or ("" if sid else resume_text)
+    active_profile = sess_profile if sess_text or sid else resume_profile
     # Offline mode short-circuit: return sample data without any network calls
     if os.getenv("OFFLINE_MODE", "0").lower() in {"1", "true", "yes", "on"}:
         user_q = (req.query or "").strip()
@@ -559,7 +604,7 @@ def search_internships(req: SearchRequest):
     user_q = (req.query or "").strip()
     loc_fallback = "India"
     loc_from_filters = req.filters.location if req.filters else None  # type: ignore
-    location = loc_from_filters or resume_profile.get("location") or loc_fallback
+    location = loc_from_filters or active_profile.get("location") or loc_fallback
 
     # Blended queries: user + resume + buzzword roles + fallback + tech-enhanced queries
     queries = set()
@@ -570,17 +615,17 @@ def search_internships(req: SearchRequest):
         if tech_enhanced != user_q:
             queries.add(tech_enhanced)
     
-    if resume_profile["roles"]:
-        for role in list(resume_profile["roles"])[:2]:
+    if active_profile["roles"]:
+        for role in list(active_profile["roles"])[:2]:
             queries.add(f"{role} internship")
-    if resume_profile["skills"]:
+    if active_profile["skills"]:
         # Create skill-based queries with tech focus
-        top_skills = list(resume_profile["skills"])[:3]
+        top_skills = list(active_profile["skills"])[:3]
         skill_query = " ".join(top_skills) + " internship"
         queries.add(skill_query)
         # Add individual high-value skill queries
         high_value_skills = ["python", "java", "javascript", "react", "machine learning", "data science"]
-        for skill in resume_profile["skills"]:
+        for skill in active_profile["skills"]:
             if skill.lower() in high_value_skills:
                 queries.add(f"{skill} developer internship")
     
@@ -591,7 +636,7 @@ def search_internships(req: SearchRequest):
             queries.add(f"{role} internship")
     
     # Add default tech queries if no specific tech skills found
-    if not any(skill in str(resume_profile.get("skills", [])).lower() 
+    if not any(skill in str(active_profile.get("skills", [])).lower() 
               for skill in ["python", "java", "javascript", "react", "data"]):
         queries.add("software engineer internship")
         queries.add("web developer internship")
@@ -681,7 +726,7 @@ def search_internships(req: SearchRequest):
 
     # Score
     for job in all_jobs:
-        s = _score_job(job, resume_profile)
+        s = _score_job(job, active_profile)
         job["score"] = s
         if s >= 85:
             job.setdefault("tags", []).append("🔥 hot")
@@ -698,7 +743,7 @@ def search_internships(req: SearchRequest):
         if not jobs:
             continue
         max_s = max(j["score"] for j in jobs) or 1
-    for j in jobs:
+        for j in jobs:
             j["score"] = round((j["score"] / max_s) * 100, 2)
 
     # Sort inside each source
@@ -745,9 +790,14 @@ def search_internships(req: SearchRequest):
 # Chat Endpoint (resume-aware and fun)
 # -----------------------------
 @app.post("/api/chat")
-def chat_with_ai(req: ChatRequest):
+def chat_with_ai(req: ChatRequest, request: Request):
     global resume_text, resume_profile
     msg = (req.message or "").strip()
+    # Derive effective session id: body field takes precedence, else header
+    sid = req.session_id or _get_session_id(request)
+    sess_text, sess_profile = _get_session_profile(sid)
+    active_text = sess_text or ("" if sid else resume_text)
+    active_profile = sess_profile if sess_text or sid else resume_profile
     lower = msg.lower()
 
     if not msg:
@@ -756,7 +806,7 @@ def chat_with_ai(req: ChatRequest):
     # If OpenRouter is configured and not in OFFLINE_MODE, always return ONLY the AI's reply
     ai_enabled = (os.getenv("OFFLINE_MODE", "0").lower() not in {"1","true","yes","on"}) and bool(_openrouter_config()[0])
     if ai_enabled:
-        ai_reply = _ai_enhanced_response(msg, resume_text, resume_profile)
+        ai_reply = _ai_enhanced_response(msg, active_text, active_profile)
         if ai_reply:
             return {"response": ai_reply}
         return {"response": "I’m having trouble reaching the AI right now. Please try again in a moment."}
@@ -769,8 +819,9 @@ def chat_with_ai(req: ChatRequest):
 # Resume Upload Endpoint
 # -----------------------------
 @app.post("/api/upload-resume")
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(request: Request, file: UploadFile = File(...)):
     global resume_text, resume_profile
+    sid = _get_session_id(request)
     content = await file.read()
     text = ""
     fname = file.filename.lower()
@@ -807,7 +858,7 @@ async def upload_resume(file: UploadFile = File(...)):
     if not text:
         return {"error": "No readable text extracted from resume."}
 
-    resume_text = text
+    resume_text = text  # legacy global for backward-compat
 
     # Extract profile info
     extracted_skills = set(_extract_keywords(text, max_terms=32))
@@ -823,19 +874,31 @@ async def upload_resume(file: UploadFile = File(...)):
     extracted_roles = _extract_roles(text)
     loc = _extract_location(text)
 
-    # Update global profile (merge to keep previously inferred data)
+    # Update legacy global profile (for old clients)
     resume_profile["skills"] = set(extracted_skills)
     resume_profile["roles"] = set(extracted_roles) or resume_profile.get("roles", set())
     if loc:
         resume_profile["location"] = loc
 
+    # Write to session-scoped store as the source of truth for multi-user safety
+    if sid:
+        _sessions[sid] = {
+            "resume_text": text,
+            "resume_profile": {
+                "skills": set(extracted_skills),
+                "roles": set(extracted_roles) or set(),
+                "location": loc or None,
+            },
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+
     return {
         "success": True,
         "filename": file.filename,
-        "skills_count": len(resume_profile["skills"]),
-        "roles": sorted(list(resume_profile["roles"]))[:10],
-        "location": resume_profile.get("location"),
-        "sample_text": resume_text[:400]
+    "skills_count": len(extracted_skills),
+    "roles": sorted(list(extracted_roles))[:10],
+    "location": loc,
+    "sample_text": text[:400]
     }
 
 # -----------------------------

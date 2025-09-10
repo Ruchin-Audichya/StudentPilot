@@ -26,6 +26,19 @@ type DashboardProps = {
 
 export default function Dashboard({ profile }: DashboardProps) {
    const navigate = useNavigate(); // Initialize useNavigate hook
+  // Stable client session id used to scope resume/chat per browser
+  const sessionIdRef = useRef<string | null>(null);
+  if (!sessionIdRef.current) {
+    try {
+      const key = "wm.session.v1";
+      let sid = localStorage.getItem(key);
+      if (!sid) {
+        sid = crypto.randomUUID();
+        localStorage.setItem(key, sid);
+      }
+      sessionIdRef.current = sid;
+    } catch {}
+  }
   const stored = (() => {
     try {
       return JSON.parse(localStorage.getItem("onboarding") || "null") as StudentProfile | null;
@@ -98,7 +111,10 @@ export default function Dashboard({ profile }: DashboardProps) {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API_BASE}/api/resume-status`, { cache: "no-store" });
+        const r = await fetch(`${API_BASE}/api/resume-status`, {
+          cache: "no-store",
+          headers: sessionIdRef.current ? { "X-Session-Id": sessionIdRef.current } : undefined,
+        });
         if (!r.ok) return;
         const d = await r.json();
         setSuggestedSkills(Array.isArray(d.skills) ? d.skills.slice(0, 12) : []);
@@ -184,6 +200,7 @@ export default function Dashboard({ profile }: DashboardProps) {
       const res = await fetch(`${API_BASE}/api/upload-resume`, {
         method: "POST",
         body: formData,
+        headers: sessionIdRef.current ? { "X-Session-Id": sessionIdRef.current } : undefined,
       });
       const data = await res.json();
       console.log("Resume upload:", data);
@@ -204,6 +221,7 @@ export default function Dashboard({ profile }: DashboardProps) {
 
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (sessionIdRef.current) headers["X-Session-Id"] = sessionIdRef.current;
       try {
         const token = await auth.currentUser?.getIdToken();
         if (token) headers["id_token"] = token;
@@ -212,7 +230,7 @@ export default function Dashboard({ profile }: DashboardProps) {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: userMsg.text }),
+  body: JSON.stringify({ message: userMsg.text, session_id: sessionIdRef.current || undefined }),
       });
       const data = await res.json();
       const botMsg = { role: "bot", text: data.response || "No response" };
