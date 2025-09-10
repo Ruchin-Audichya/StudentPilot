@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import MarkdownMessage from "../MarkdownMessage";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type SectionKey = "summary" | "gaps" | "fixes" | "roles" | "extras" | "tip";
@@ -48,8 +49,8 @@ export default function StructuredAnswer({ text }: { text: string }) {
   const hasAny = order.some((k) => (sections[k]?.join("\n").trim().length || 0) > 0);
   if (!hasAny) {
     return (
-      <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-[15px] leading-relaxed whitespace-pre-wrap">
-        {text}
+      <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-[15px] leading-relaxed">
+        <MarkdownMessage text={text} />
       </div>
     );
   }
@@ -69,8 +70,8 @@ export default function StructuredAnswer({ text }: { text: string }) {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="px-3 pb-3">
-                  <div className="text-[14px] md:text-[15px] whitespace-pre-wrap">
-                    {body}
+                  <div className="text-[14px] md:text-[15px]">
+                    <MarkdownMessage text={body} />
                   </div>
                   <div className="mt-2 text-right">
                     <button className="wm-pill px-3 py-1.5 text-xs" onClick={() => copy(`${titles[k]}\n${body}`)}>Copy 📋</button>

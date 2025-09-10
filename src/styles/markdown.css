@@ -1,6 +1,8 @@
-p { margin: 0.25rem 0; }
-ul, ol { margin: 0.25rem 0; padding-left: 1.25rem; }
-li { margin: 0.15rem 0; color: #cbd5e1; }
-strong { font-weight: 600; }
-code { background: rgba(255,255,255,0.1); padding: 0.1rem 0.25rem; border-radius: 4px; font-size: 0.85em; border: 1px solid #333; color: #fff; }
-.markdown-message { color: #fff; }
+/* Scoped markdown styles inside chat */
+.markdown-message { color: #e5e7eb; line-height: 1.6; }
+.markdown-message p { margin: 0.25rem 0; }
+.markdown-message ul, .markdown-message ol { margin: 0.25rem 0; padding-left: 1.25rem; }
+.markdown-message li { margin: 0.15rem 0; }
+.markdown-message strong, .markdown-message b { font-weight: 700; color: #ffffff; }
+.markdown-message em, .markdown-message i { font-style: italic; }
+.markdown-message code { background: rgba(255,255,255,0.08); padding: 0.1rem 0.25rem; border-radius: 4px; font-size: 0.85em; border: 1px solid rgba(255,255,255,0.12); color: #fff; }
