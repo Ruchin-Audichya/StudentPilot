@@ -1,4 +1,5 @@
 # main.py - Full Feature + Speed + Variety + Buzzword Expansion
+# deploy-marker: update to trigger redeploy and ensure latest backend is live
 
 import os
 try:
@@ -502,13 +503,27 @@ async def gemini_generate(request: Request):
     return result
 
 @app.get("/api/ai-test")
-def ai_test():
-    """Quick diagnostic to verify OpenRouter connectivity (no resume context)."""
-    key, models, *_ = _openrouter_config()
-    if not key:
-        return {"ok": False, "reason": "OPENROUTER_API_KEY not set in environment"}
-    sample = _ai_enhanced_response("Return one word: ping", "", {})
-    return {"ok": bool(sample), "sample": sample or None, "model": models[:1], "last_error": _LAST_AI_ERROR}
+def ai_test(request: Request, safe: bool = False):
+    """Quick diagnostic to verify OpenRouter connectivity (no resume context).
+
+    Never throws; returns ok=false with error details on failure.
+    """
+    try:
+        key, models, *_ = _openrouter_config()
+        if safe:
+            return {
+                "ok": True,
+                "mode": "safe",
+                "key_present": bool(key),
+                "model": models[:1],
+                "last_error": _LAST_AI_ERROR,
+            }
+        if not key:
+            return {"ok": False, "reason": "OPENROUTER_API_KEY not set in environment"}
+        sample = _ai_enhanced_response("Return one word: ping", "", {})
+        return {"ok": bool(sample), "sample": sample or None, "model": models[:1], "last_error": _LAST_AI_ERROR}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:300], "last_error": _LAST_AI_ERROR}
 
 # -----------------------------
 # Models
