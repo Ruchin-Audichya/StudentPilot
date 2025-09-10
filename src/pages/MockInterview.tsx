@@ -155,6 +155,8 @@ const MockInterview = () => {
                 URL.revokeObjectURL(questionAudioUrlRef.current);
                 questionAudioUrlRef.current = null;
             }
+            // Also cancel Web Speech fallback if active
+            try { (window as any)?.speechSynthesis?.cancel?.(); } catch {}
         } catch {}
         isQuestionTTSPlayingRef.current = false;
         // If a speakQuestion call is awaiting playback end, resolve it so we don't hang on barge-in
@@ -198,6 +200,7 @@ const MockInterview = () => {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${API_KEY}`;
 
         try {
+            try { await audioContextRef.current?.resume?.(); } catch {}
             const response = await fetchWithBackoff(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -218,6 +221,9 @@ const MockInterview = () => {
                 const audioUrl = URL.createObjectURL(wavBlob);
                 // Setup audio element for TTS with barge-in control
                 const audio = new Audio(audioUrl);
+                // iOS/Safari friendly settings
+                try { (audio as any).playsInline = true; } catch {}
+                audio.preload = 'auto';
                 questionAudioRef.current = audio;
                 questionAudioUrlRef.current = audioUrl;
                 bargedInRef.current = false;
@@ -246,13 +252,44 @@ const MockInterview = () => {
                 stopQuestionTTS();
             } else {
                 console.error("No audio data received or unexpected mime type:", result);
-                // Fallback to text display and proceed without audio if TTS fails
-                setQuestionDisplay(questionText);
+                // Fallback: try Web Speech API TTS if available
+                const synth = (window as any)?.speechSynthesis;
+                if (synth && typeof synth.speak === 'function') {
+                    const u = new (window as any).SpeechSynthesisUtterance(questionText);
+                    try {
+                        const voices = synth.getVoices?.() || [];
+                        const en = voices.find((v: any) => /en[-_]?US/i.test(v.lang)) || voices[0];
+                        if (en) (u as any).voice = en;
+                        u.rate = 0.95; u.pitch = 1; u.volume = 1;
+                    } catch {}
+                    await new Promise<void>((resolve) => {
+                        isQuestionTTSPlayingRef.current = true;
+                        ttsResolveRef.current = () => { isQuestionTTSPlayingRef.current = false; resolve(); };
+                        u.onend = () => { isQuestionTTSPlayingRef.current = false; resolve(); };
+                        try { synth.speak(u); } catch { resolve(); }
+                    });
+                } else {
+                    // Final fallback: text only
+                    setQuestionDisplay(questionText);
+                }
             }
         } catch (error) {
             console.error("Error with TTS API:", error);
             setStatusMessage("Error speaking question. Displaying text instead.");
-            setQuestionDisplay(questionText);
+            // Web Speech fallback if possible
+            const synth = (window as any)?.speechSynthesis;
+            if (synth && typeof synth.speak === 'function') {
+                const u = new (window as any).SpeechSynthesisUtterance(questionText);
+                try {
+                    const voices = synth.getVoices?.() || [];
+                    const en = voices.find((v: any) => /en[-_]?US/i.test(v.lang)) || voices[0];
+                    if (en) (u as any).voice = en;
+                    u.rate = 0.95; u.pitch = 1; u.volume = 1;
+                } catch {}
+                try { synth.speak(u); } catch {}
+            } else {
+                setQuestionDisplay(questionText);
+            }
         }
     }, []);
 
@@ -686,8 +723,12 @@ const MockInterview = () => {
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
             }
+            try { audioContextRef.current?.resume?.(); } catch {}
         };
-        document.body.addEventListener('click', handleUserGesture, { once: true });
+        // Unlock audio on first interaction across devices
+        document.body.addEventListener('click', handleUserGesture, { once: true, passive: true } as any);
+        document.body.addEventListener('touchstart', handleUserGesture, { once: true, passive: true } as any);
+        document.body.addEventListener('pointerdown', handleUserGesture, { once: true, passive: true } as any);
         // Video playing/loaded => hide overlay
         const v = webcamVideoRef.current as HTMLVideoElement | null;
         const onPlaying = () => { setHasLiveVideo(true); setShowNoCameraMessage(false); };
@@ -704,7 +745,9 @@ const MockInterview = () => {
             if (active) setShowNoCameraMessage(false);
         }, 800);
         return () => {
-            document.body.removeEventListener('click', handleUserGesture);
+            document.body.removeEventListener('click', handleUserGesture as any);
+            document.body.removeEventListener('touchstart', handleUserGesture as any);
+            document.body.removeEventListener('pointerdown', handleUserGesture as any);
             if (v) {
                 v.removeEventListener('playing', onPlaying);
                 v.removeEventListener('loadeddata', onLoaded);
