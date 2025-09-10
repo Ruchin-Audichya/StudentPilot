@@ -809,28 +809,36 @@ def search_internships(req: SearchRequest, request: Request):
 @app.post("/api/chat")
 def chat_with_ai(req: ChatRequest, request: Request):
     global resume_text, resume_profile
-    msg = (req.message or "").strip()
-    # Derive effective session id: body field takes precedence, else header
-    sid = req.session_id or _get_session_id(request)
-    sess_text, sess_profile = _get_session_profile(sid)
-    active_text = sess_text or ("" if sid else resume_text)
-    active_profile = sess_profile if sess_text or sid else resume_profile
-    lower = msg.lower()
+    try:
+        msg = (req.message or "").strip()
+        # Derive effective session id: body field takes precedence, else header
+        sid = req.session_id or _get_session_id(request)
+        sess_text, sess_profile = _get_session_profile(sid)
+        active_text = sess_text or ("" if sid else resume_text)
+        active_profile = sess_profile if sess_text or sid else resume_profile
 
-    if not msg:
-        return {"response": "Please ask a question, e.g., ‘Rate my resume’."}
+        if not msg:
+            return {"response": "Please ask a question, e.g., ‘Rate my resume’."}
 
-    # If OpenRouter is configured and not in OFFLINE_MODE, always return ONLY the AI's reply
-    ai_enabled = (os.getenv("OFFLINE_MODE", "0").lower() not in {"1","true","yes","on"}) and bool(_openrouter_config()[0])
-    if ai_enabled:
-        ai_reply = _ai_enhanced_response(msg, active_text, active_profile)
-        if ai_reply:
-            return {"response": ai_reply}
-        return {"response": "I’m having trouble reaching the AI right now. Please try again in a moment."}
+        # If OpenRouter is configured and not in OFFLINE_MODE, always return ONLY the AI's reply
+        ai_enabled = (os.getenv("OFFLINE_MODE", "0").lower() not in {"1","true","yes","on"}) and bool(_openrouter_config()[0])
+        if ai_enabled:
+            ai_reply = _ai_enhanced_response(msg, active_text, active_profile)
+            if ai_reply:
+                return {"response": ai_reply}
+            return {"response": "I’m having trouble reaching the AI right now. Please try again in a moment."}
 
-    # Fallback (no AI configured): keep responses minimal, no boilerplate.
-    # Provide a tiny hint only; avoid long hardcoded content.
-    return {"response": "AI is not configured on the server. Add OPENROUTER_API_KEY to enable smart answers."}
+        # Fallback (no AI configured): keep responses minimal, no boilerplate.
+        # Provide a tiny hint only; avoid long hardcoded content.
+        return {"response": "AI is not configured on the server. Add OPENROUTER_API_KEY to enable smart answers."}
+    except Exception as e:
+        if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
+            import traceback, logging
+            logging.basicConfig(level=logging.INFO)
+            logging.error("/api/chat crashed: %s", e)
+            logging.error("Trace: %s", traceback.format_exc())
+        # Never surface a 500 to the browser for chat; respond with a safe message
+        return {"response": "I hit a snag processing that. Please try again."}
 
 @app.get("/api/chat")
 def chat_get_hint():
