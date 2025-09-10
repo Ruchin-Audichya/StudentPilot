@@ -83,7 +83,7 @@ export default function Landing() {
           Find My Stipend
         </motion.h2>
         <p className="mt-3 sm:mt-4 text-gray-400 text-base sm:text-lg md:text-xl max-w-2xl mx-auto">
-          Your skills. Your dreams. Your stipend—delivered.
+          AI that finds the right internship—so you don’t have to
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.25 }} className="inline-block">
