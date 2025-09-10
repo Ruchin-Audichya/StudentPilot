@@ -8,9 +8,9 @@ declare global {
     }
 }
 
-const API_KEY = "AIzaSyBiFK1ZKiiWJpjvC7ZiO4nm1AiOvFwSCZg"
-const TEXT_GENERATION_MODEL = "gemini-2.5-flash-preview-05-20";
-const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+const API_KEY = (import.meta as any)?.env?.VITE_GEMINI_API_KEY || "";
+const TEXT_GENERATION_MODEL = (import.meta as any)?.env?.VITE_GEMINI_TEXT_MODEL || "gemini-2.5-flash";
+const TTS_MODEL = (import.meta as any)?.env?.VITE_GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 
 const interviewQuestions = [
     "Tell me about yourself.",
@@ -170,6 +170,11 @@ const MockInterview = () => {
     // Function to speak the question using Gemini TTS
     const speakQuestion = useCallback(async (questionText) => {
         if (!isInterviewActiveRef.current) return; // Guard against stray calls
+        if (!API_KEY) {
+            setStatusMessage("TTS unavailable (missing Gemini key). Showing text only.");
+            setQuestionDisplay(questionText);
+            return;
+        }
         setStatusMessage("Interviewer speaking...");
         // Slight variety in prosody: optional preface and small pre-silence
         const prefaces = ["Okay.", "Alright.", "Got it.", "Thanks."];
@@ -253,6 +258,10 @@ const MockInterview = () => {
 
     // Function to get AI feedback on user's response
     const getAIResponse = useCallback(async (question, userAnswer) => {
+        if (!API_KEY) {
+            setAiFeedback("AI feedback unavailable (missing Gemini key). Configure VITE_GEMINI_API_KEY.");
+            return;
+        }
         setIsProcessing(true);
         const chatHistory = [];
         chatHistory.push({
