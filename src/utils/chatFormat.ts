@@ -7,13 +7,19 @@ export function sanitizeAndShapeReply(input: string): string {
   text = text.replace(/^ai\s*suggestion.*$/gim, "");
   // Remove repeated SUMMARY headers
   text = text.replace(/^(SUMMARY:)+/gi, "SUMMARY:");
-  // Collapse blank lines
-  text = text.replace(/\n{2,}/g, "\n");
+  // Normalize excessive blank lines but keep paragraph spacing
+  text = text.replace(/\n{3,}/g, "\n\n");
+  // Clean up stray double spaces at EOL
+  text = text.replace(/[ \t]+\n/g, "\n");
   // Split long paragraphs into bullets
-  text = text.replace(/([^\n]{240,})/g, (m) => {
+  text = text.replace(/([^\n]{320,})/g, (m) => {
     return m.split(/(?<=\.|\!|\?)\s+/).map(s => s.trim() ? `- ${s.trim()}` : "").join("\n");
   });
-  // Limit to ~200 words
+  // If it's clearly a rating-only output like "8/10", return as-is
+  if (/^\s*\d{1,2}\s*\/\s*10\s*$/m.test(text.trim())) {
+    return text.trim();
+  }
+  // Limit to ~220 words unless user asked long; the server already hints length, this is a guard
   const words = text.split(/\s+/);
   if (words.length > 220) {
     let count = 0, out = [];

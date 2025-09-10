@@ -334,17 +334,22 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) ->
     if not key or not user_message.strip():
         return ""
     system_prompt = (
-        "You are StudentPilot—an internship and resume mentor. Be concrete, kind, and useful.\n"
-        "Goals:\n"
-        "1) Focus on the user's resume context (skills, roles, location) if present.\n"
-        "2) Extract identity if asked (name, email, phone, location) only from provided resume text.\n"
-        "3) Give actionable advice for internships: role suggestions, skill gaps, next steps, and resources.\n"
-        "4) Keep answers concise, scannable, and positive.\n\n"
-        "Output format (use emojis and bullets):\n"
+        "You are StudentPilot—an internship and resume mentor. Be concrete, kind, and helpful.\n"
+        "STYLE:\n"
+        "- Human-sounding, positive, and specific.\n"
+        "- Use clean Markdown: bullets (- ), numbered lists, and **bold** sparingly.\n"
+        "- Avoid boilerplate and disclaimers.\n"
+        "- Never reveal chain-of-thought.\n\n"
+        "ADAPTIVE LENGTH & FORMAT RULES:\n"
+        "- If the user asks for 'short', 'one line', or says 'nothing else', return only the minimal requested content.\n"
+        "- If the user says 'rate my resume out of 10' and 'nothing else', return just a rating like '8/10' with no extra text.\n"
+        "- If the user asks for 'long' or 'detailed', provide richer bullets (5–8 items) with explanations.\n"
+        "- Otherwise default to concise sections.\n\n"
+        "DEFAULT SECTIONS (when a full answer is appropriate):\n"
         "🎯 Summary\n"
         "🧩 Skill Gaps (if any)\n"
-        "�️ Improvements (clear next steps)\n"
-        "� Roles & Keywords to target\n"
+        "🔧 Improvements (clear next steps)\n"
+        "🧭 Roles & Keywords to target\n"
         "📌 Extras (links, ideas)\n"
         "💡 Tip\n"
     )
@@ -354,15 +359,37 @@ def _ai_enhanced_response(user_message: str, resume_text: str, profile: Dict) ->
         "location": profile.get("location"),
     }
     resume_excerpt = (resume_text or "")[:4000]
+    # Heuristic: adapt generation settings to user intent
+    um = (user_message or "").lower()
+    short_hint = any(k in um for k in ["short", "one line", "one-line", "nothing else"])
+    wants_rating_only = ("out of 10" in um and "nothing else" in um) or re.search(r"\b(\d+\s*/\s*10)\b", um)
+    long_hint = any(k in um for k in ["long", "detailed", "elaborate"]) and not short_hint
+
+    temp = 0.7
+    max_toks = 500
+    if wants_rating_only:
+        temp = 0.4
+        max_toks = 30
+    elif short_hint:
+        temp = 0.6
+        max_toks = 120
+    elif long_hint:
+        temp = 0.8
+        max_toks = 700
+
+    # Add an explicit mode hint for the assistant
+    mode_hint = "MODE: rating-only (just 'X/10')." if wants_rating_only else (
+        "MODE: short." if short_hint else ("MODE: long/detail." if long_hint else "MODE: default."))
+
     for model in models:
         payload = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"User message: {user_message}\nProfile: {json.dumps(profile_snippet)}\nResume excerpt: {resume_excerpt}"},
+                {"role": "user", "content": f"{mode_hint}\nUser message: {user_message}\nProfile: {json.dumps(profile_snippet)}\nResume excerpt: {resume_excerpt}"},
             ],
-            "temperature": 0.7,
-            "max_tokens": 500,
+            "temperature": temp,
+            "max_tokens": max_toks,
         }
         headers = {
             "Authorization": f"Bearer {key}",
