@@ -5,6 +5,7 @@ import Landing from "@/pages/Landing";
 import MockInterview from '@/pages/MockInterview'; 
 import ResumeGenius from '@/pages/ResumeGenius';
 import Chat from '@/pages/Chat';
+import OppRadar from '@/pages/OppRadar';
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
@@ -16,7 +17,7 @@ export default function App() {
   const isMobile = useIsMobile();
   return (
     <Router>
-      <Routes>
+  <Routes>
         {/* Landing page */}
         <Route path="/" element={<>
           <Landing />
@@ -33,6 +34,9 @@ export default function App() {
           <ResumeGenius />
           {isMobile && <MobileTabBar />}
         </>} />
+
+  {/* OppRadar page */}
+  <Route path="/oppradar" element={<OppRadar />} />
 
         {/* Chat page */}
         <Route path="/chat" element={<>

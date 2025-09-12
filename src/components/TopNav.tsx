@@ -3,8 +3,13 @@ import { useState } from "react";
 
 type Action = { label: string; to: string; newTab?: boolean };
 
-export default function TopNav({ actions = [] as Action[] }: { actions?: Action[] }) {
+export default function TopNav({ actions = [] as Action[] }) {
   const [open, setOpen] = useState(false);
+  // Always add OppRadar to actions if not present
+  const mergedActions = [
+    ...actions,
+    { label: "OppRadar", to: "/oppradar" },
+  ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
     <nav className="sticky top-0 z-30 bg-black/60 backdrop-blur border-b border-white/10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
@@ -13,7 +18,7 @@ export default function TopNav({ actions = [] as Action[] }: { actions?: Action[
         </h1>
         {/* Desktop actions */}
         <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
-          {actions.map((a) => (
+          {mergedActions.map((a) => (
             a.newTab ? (
               <a
                 key={a.to}
@@ -42,6 +47,7 @@ export default function TopNav({ actions = [] as Action[] }: { actions?: Action[
             <Link to="/mock-interview" className="wm-pill px-3 py-2 text-sm text-left">🎙️ Mock Interview</Link>
             <Link to="/resume-genius" className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</Link>
             <Link to="/dashboard" className="wm-pill px-3 py-2 text-sm text-left">📅 Dashboard</Link>
+            <Link to="/oppradar" className="wm-pill px-3 py-2 text-sm text-left">🛰️ OppRadar</Link>
             <Link to="/logout" className="wm-pill px-3 py-2 text-sm text-left">🚪 Logout</Link>
           </div>
         </div>

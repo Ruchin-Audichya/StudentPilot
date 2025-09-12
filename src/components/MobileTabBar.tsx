@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, LayoutDashboard, MessageCircle, FileText, MoreHorizontal } from "lucide-react";
+import { Home, LayoutDashboard, MessageCircle, FileText, MoreHorizontal, Radar } from "lucide-react";
 
 export default function MobileTabBar() {
   const nav = useNavigate();
@@ -29,6 +29,7 @@ export default function MobileTabBar() {
         <div className="flex items-center justify-between gap-1">
           <Item icon={Home} label="Home" to="/" />
           <Item icon={LayoutDashboard} label="Dashboard" to="/dashboard" />
+          <Item icon={Radar} label="OppRadar" to="/oppradar" />
           <Item icon={MessageCircle} label="Chat" to="/chat" />
           <Item icon={FileText} label="Resume" to="/resume-genius" />
           <button
@@ -46,6 +47,7 @@ export default function MobileTabBar() {
         <div className="absolute bottom-[64px] left-0 right-0 px-3 pb-2">
           <div className="rounded-2xl border border-white/10 bg-black/80 backdrop-blur p-2 grid grid-cols-2 gap-2 mx-2">
             <button onClick={() => go('/mock-interview')} className="wm-pill px-3 py-2 text-sm text-left">🎙️ Mock Interview</button>
+            <button onClick={() => go('/oppradar')} className="wm-pill px-3 py-2 text-sm text-left">🛰️ OppRadar</button>
             <button onClick={() => go('/resume-genius')} className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</button>
             <button onClick={() => go('/dashboard')} className="wm-pill px-3 py-2 text-sm text-left">📅 Dashboard</button>
             <button onClick={() => go('/logout')} className="wm-pill px-3 py-2 text-sm text-left">🚪 Logout</button>
