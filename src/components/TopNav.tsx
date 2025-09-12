@@ -8,7 +8,7 @@ export default function TopNav({ actions = [] as Action[] }) {
   // Always add OppRadar to actions if not present
   const mergedActions = [
     ...actions,
-    { label: "OppRadar", to: "/oppradar" },
+    { label: "🛰️ Opportunity Radar", to: "/oppradar" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
     <nav className="sticky top-0 z-30 bg-black/60 backdrop-blur border-b border-white/10">
@@ -47,7 +47,7 @@ export default function TopNav({ actions = [] as Action[] }) {
             <Link to="/mock-interview" className="wm-pill px-3 py-2 text-sm text-left">🎙️ Mock Interview</Link>
             <Link to="/resume-genius" className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</Link>
             <Link to="/dashboard" className="wm-pill px-3 py-2 text-sm text-left">📅 Dashboard</Link>
-            <Link to="/oppradar" className="wm-pill px-3 py-2 text-sm text-left">🛰️ OppRadar</Link>
+            <Link to="/oppradar" className="wm-pill px-3 py-2 text-sm text-left">🛰️ Opportunity Radar</Link>
             <Link to="/logout" className="wm-pill px-3 py-2 text-sm text-left">🚪 Logout</Link>
           </div>
         </div>
