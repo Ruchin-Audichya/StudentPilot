@@ -62,6 +62,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [hrLoading, setHrLoading] = useState(false);
   const [hrLinks, setHrLinks] = useState<{ label: string; url: string }[]>([]);
   const [hrProfiles, setHrProfiles] = useState<HRProfileLink[]>([]);
+  const [hrCompany, setHrCompany] = useState<string>("");
   const [generatingPortfolio, setGeneratingPortfolio] = useState(false);
   const [onlyPaid, setOnlyPaid] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
@@ -220,6 +221,7 @@ export default function Dashboard({ profile }: DashboardProps) {
         if (preferred?.company) {
           const profs = await fetchHRProfiles({ company: preferred.company, roles: suggestedRoles.slice(0,2), location, skills: skills.slice(0,3), limit: 6 });
           setHrProfiles(profs);
+          setHrCompany(preferred.company);
         } else {
           setHrProfiles([]);
         }
@@ -640,7 +642,36 @@ export default function Dashboard({ profile }: DashboardProps) {
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
+              {/* Quick company picker */}
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <input
+                  value={hrCompany}
+                  onChange={(e) => setHrCompany(e.target.value)}
+                  placeholder="Company (e.g., NVIDIA)"
+                  className="w-full sm:w-64 px-3 py-2 rounded-lg bg-white/5 border border-card-border focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
+                <button
+                  className="text-sm px-3 py-2 rounded-lg bg-white/5 border border-card-border hover:bg-white/10 transition"
+                  onClick={async () => {
+                    if (!hrCompany.trim()) return;
+                    setHrLoading(true);
+                    try {
+                      const profs = await fetchHRProfiles({ company: hrCompany.trim(), roles: suggestedRoles.slice(0,2), location, skills: skills.slice(0,3), limit: 8 });
+                      setHrProfiles(profs);
+                    } catch (e) {
+                      console.warn("HR profiles fetch (manual) failed", e);
+                    } finally {
+                      setHrLoading(false);
+                    }
+                  }}
+                  title="Find recruiters at this company"
+                >
+                  Find Recruiters
+                </button>
+              </div>
+
+              {/* People-search links */}
+              <div className="flex flex-wrap gap-2 mb-3">
                 {hrLinks.map((l, i) => (
                   <a
                     key={`hrl-${i}`}
@@ -653,22 +684,49 @@ export default function Dashboard({ profile }: DashboardProps) {
                     {l.label || `HR search ${i+1}`}
                   </a>
                 ))}
-                {hrProfiles.map((p, i) => (
-                  <a
-                    key={`hrp-${i}`}
-                    href={p.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/15 text-emerald-200 transition"
-                    title="Open LinkedIn profile"
-                  >
-                    {p.label || `Recruiter ${i+1}`}
-                  </a>
-                ))}
                 {hrLinks.length === 0 && hrProfiles.length === 0 && (
                   <p className="text-sm text-muted-foreground">No HR links yet. Run a search to populate.</p>
                 )}
               </div>
+
+              {/* Profile cards */}
+              {hrProfiles.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {hrProfiles.map((p, i) => {
+                    const label = p.label || "LinkedIn Profile";
+                    const clean = label.replace(/\s*\|\s*LinkedIn.*/i, "");
+                    const parts = clean.split(/\s+-\s+/); // e.g., "Name - Technical Recruiter - NVIDIA"
+                    const name = parts[0] || clean;
+                    const subtitle = parts.slice(1).join(" • ");
+                    const initials = name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map(s => s[0]?.toUpperCase())
+                      .join("") || "HR";
+                    return (
+                      <div key={`card-${i}`} className="glass-card rounded-xl p-3 border border-card-border/80 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-200 font-semibold">
+                          {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{name}</div>
+                          {subtitle && <div className="text-xs text-muted-foreground truncate">{subtitle}</div>}
+                        </div>
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/15 text-emerald-200 transition whitespace-nowrap"
+                          title="Open LinkedIn profile"
+                        >
+                          Connect
+                        </a>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Portfolio generator panel */}
