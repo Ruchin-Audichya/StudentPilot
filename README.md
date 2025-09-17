@@ -1,8 +1,94 @@
 <div align="center">
 
-# Find My Stipend (StudentPilot)
+<div align="center">
 
-AI‑powered Internship Hunter — find internships, fix your resume, practice interviews, and land offers.
+	<img src="./public/mascot.svg" alt="StudentPilot Mascot" width="120" height="120" />
+
+	<h1>StudentPilot</h1>
+	<p>Find internships faster. Build your portfolio. Connect with real recruiters.</p>
+
+	<p>
+		<a href="#features"><img alt="features" src="https://img.shields.io/badge/Features-rich-7A5CFF?style=for-the-badge"/></a>
+		<a href="#quickstart"><img alt="quickstart" src="https://img.shields.io/badge/Quickstart-1%20min-5AD7FF?style=for-the-badge"/></a>
+		<a href="#license"><img alt="license" src="https://img.shields.io/badge/License-MIT-00C2A8?style=for-the-badge"/></a>
+	</p>
+
+	<img src="./public/placeholder.svg" alt="Hero" width="720" />
+</div>
+
+---
+
+StudentPilot is a full-stack app that blends multiple job sources (Internshala, LinkedIn, company ATS careers) with resume-aware ranking, an AI-powered portfolio generator (Gemini), and HR tooling that surfaces real recruiter profiles to connect with—ready for Render + Vercel deployment.
+
+## Table of Contents
+- [Features](#features)
+- [Demo Shots](#demo-shots)
+- [Architecture](#architecture)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Development](#development)
+- [Deploy](#deploy)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+## Features
+- Blended internship search
+	- Internshala + LinkedIn + ATS company careers (Lever, Greenhouse, Workday, SmartRecruiters, generic pages)
+	- Resume-aware queries and result scoring; “hot” tags; newness signal
+	- Source filters and counts; direct company “Apply Now” links
+- LinkedIn premium signals
+	- Detects Easy Apply, promoted, actively hiring; optional Easy Apply variant
+- HR tooling that actually helps
+	- People-search links for LinkedIn (skills/roles/location)
+	- Real recruiter profiles discovery via public web search for `/in/` profiles
+	- Batch mode: grouped recruiter cards by company, with Connect buttons
+- AI portfolio generator
+	- Template + enrichment mode (fast, clean)
+	- Full-site Gemini mode: returns a complete `index.html` + `styles.css` based on your resume
+	- One-click ZIP download; Vercel/Pages friendly
+- Resume analyzer
+	- Missing keywords, AI-flagged weak points, grammar fixes
+- Smooth UI
+	- React + Vite + TypeScript + Tailwind/shadcn; animations via Framer Motion
+
+## Demo Shots
+
+<details>
+<summary>Dashboard — Search & Filters</summary>
+
+![Dashboard](./public/placeholder.svg)
+
+</details>
+
+<details>
+<summary>Recruiter Profiles — Grouped by Company</summary>
+
+![Recruiters](./public/placeholder.svg)
+
+</details>
+
+<details>
+<summary>Instant Portfolio — AI ZIP Download</summary>
+
+![Portfolio](./public/placeholder.svg)
+
+</details>
+
+## Architecture
+- Frontend: React (Vite) + TypeScript + Tailwind/shadcn
+	- `src/services/*` for API calls, `src/components/*` for UI (Dashboard, JobCard, HR panels)
+- Backend: FastAPI
+	- Scrapers: Internshala, LinkedIn (HTTP-first with fallback), ATS (Lever/Greenhouse/SmartRecruiters/Workday), Generic
+	- Routes: `/api/search`, `/api/upload-resume`, `/api/portfolio/generate`, `/api/linkedin/hr-links`, `/api/linkedin/hr-profiles`, `/api/linkedin/hr-profiles/batch`
+	- AI: OpenRouter (chat/analyzer) and Gemini proxy (portfolio)
+	- Render-friendly; CORS and health endpoints
+
+## Quickstart
+
+Prereqs: Node 18+, Python 3.11+, Git
+
+```powershell
 
 <br/>
 
@@ -21,37 +107,25 @@ AI‑powered Internship Hunter — find internships, fix your resume, practice i
 
 ## 🧠 Feature highlights
 - Internship Search
-	- Blended queries (user + resume + tech enhancements) → fast scrapers (time‑budgeted, parallel)
 	- LinkedIn optional path; ATS company careers coverage (Lever/Greenhouse/SmartRecruiters/Workday) with generic fallback
-	- Dedupe + heuristic scoring + “new” highlighting
 - Resume Genius
 	- Rule‑based scoring (0–100) + missing keywords list
 	- AI enrichment (suggestions, weak points, grammar) via OpenRouter/Gemini
 - Mock Interview
 	- Session‑aware: reads your uploaded resume
 	- Generates 5–6 simple, practical questions (2 behavioral + technical aligned to skills)
-	- Dynamic follow‑ups based on your last answer
-	- Clean audio UX: TTS question, speech recognition, auto‑stop on silence, barge‑in, feedback
-- HR Connect
-	- HR/recruiter search links: by company/role/skills/location
 - Messages
 	- Short cover letters/LinkedIn notes (LLM fallback to template)
 - Instant Portfolio
-	- Downloadable static site ZIP with your highlights; deploy in minutes
 - Testimonials
 	- “Got Hired via FindMyStipend?” submission (image + note); grid showcased on homepage
 
 ## 🏗️ Tech
-- Frontend: React (Vite) + TypeScript + Tailwind + shadcn/ui + Framer Motion
 - Backend: FastAPI (Python), Requests+BS4, PyMuPDF/python‑docx, optional Playwright/Selenium
-- AI: OpenRouter (configurable models), optional Gemini proxy
 - Deploy: Vercel (FE), Render/EB (BE)
 
 ## 🖼️ Screens (add your screenshots)
 - Dashboard: analyzer, HR links, ranked jobs
-- Job Card: “Apply Now”, missing keywords
-- Mock Interview: video, live levels, feedback
-- Portfolio: download card
 - Testimonials: success stories grid
 
 ## ⚙️ Quickstart (Windows)
