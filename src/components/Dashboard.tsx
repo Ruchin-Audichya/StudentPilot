@@ -744,7 +744,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                   onClick={async () => {
                     setGeneratingPortfolio(true);
                     try {
-                      const blob = await generatePortfolioZip();
+                      const blob = await generatePortfolioZip(undefined, true, { ai: true, fullSiteAI: true });
                       downloadBlob(blob, 'portfolio.zip');
                     } catch (e) {
                       console.error('Portfolio generation failed', e);

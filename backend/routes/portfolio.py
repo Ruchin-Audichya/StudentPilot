@@ -30,6 +30,7 @@ class PortfolioRequest(BaseModel):
     include_vercel: bool = True
     ai: Optional[bool] = True  # when True and Gemini is configured, enrich content
     model: Optional[str] = None  # optional Gemini model override
+    full_site_ai: Optional[bool] = False  # when True, ask Gemini to output complete site HTML/CSS
 
 
 def _html_escape(x: Optional[str]) -> str:
@@ -295,6 +296,79 @@ def _enrich_with_ai(resume: Dict[str, Any], model: Optional[str] = None) -> Opti
         return None
 
 
+def _ai_generate_full_site(resume: Dict[str, Any], model: Optional[str] = None) -> Optional[Dict[str, str]]:
+    """Ask Gemini (via backend proxy) to produce a minimal but complete portfolio site.
+
+    Expected JSON response shape (strict):
+      { "index_html": "...", "styles_css": "..." }
+    Returns None on failure.
+    """
+    try:
+        from main import _gemini_generate_content, GOOGLE_API_KEY  # type: ignore
+    except Exception:
+        return None
+    if not GOOGLE_API_KEY:
+        return None
+    # Trim resume payload size
+    rj = resume.copy()
+    if isinstance(rj.get("projects"), list):
+        rj["projects"] = rj["projects"][:6]
+    if isinstance(rj.get("experience"), list):
+        rj["experience"] = rj["experience"][:6]
+    prompt = (
+        "You are a web generator. Create a simple, responsive, single-file portfolio website from the provided resume JSON.\n"
+        "Return ONLY a minified JSON object with exactly two string keys: index_html and styles_css. No markdown, no comments.\n"
+        "index_html: a valid HTML5 document that references styles.css via <link rel=\"stylesheet\" href=\"styles.css\">.\n"
+        "The site must include: name, summary/about, contact (email/links), skills (tags), projects (cards), experience, education.\n"
+        "Choose a clean modern style. Avoid external fonts/assets. Keep inline JS minimal or none.\n\n"
+        f"Resume JSON:\n{json.dumps(rj, ensure_ascii=False)}\n"
+    )
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2500}
+    }
+    try:
+        raw = _gemini_generate_content(model or "gemini-2.5-pro-exp-02-05", payload)
+        text = None
+        try:
+            cands = (raw or {}).get("candidates") or []
+            if cands:
+                parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
+                texts = [p.get("text") for p in parts if isinstance(p, dict) and p.get("text")]
+                text = ("\n".join(texts)).strip() if texts else None
+        except Exception:
+            text = None
+        if not text:
+            return None
+        # Strip code fences if present
+        if "```" in text:
+            try:
+                fenced = text.split("```", 2)
+                if len(fenced) >= 2:
+                    inner = fenced[1]
+                    if inner.strip().lower().startswith("json") and len(fenced) >= 3:
+                        text = fenced[2]
+                    else:
+                        text = inner
+            except Exception:
+                pass
+        # Extract JSON
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        data = json.loads(text[start:end+1])
+        if not isinstance(data, dict):
+            return None
+        ih = data.get("index_html")
+        sc = data.get("styles_css")
+        if isinstance(ih, str) and isinstance(sc, str) and "</html>" in ih.lower():
+            return {"index_html": ih, "styles_css": sc}
+        return None
+    except Exception:
+        return None
+
+
 @router.post("/generate")
 def generate_portfolio(req: PortfolioRequest, request: Request):
     resume = req.resume.model_dump() if req.resume else None
@@ -316,13 +390,27 @@ def generate_portfolio(req: PortfolioRequest, request: Request):
         except Exception:
             resume = {"name": "Student", "skills": []}
 
-    # Optional AI enrichment
-    enriched: Optional[Dict[str, Any]] = None
-    if req.ai:
-        enriched = _enrich_with_ai(resume or {}, model=(req.model or None))
-
     try:
-        data = _build_site(resume or {}, include_vercel=req.include_vercel, enriched=enriched)
+        # Optional: full-site generation via Gemini
+        if req.full_site_ai:
+            ai_site = _ai_generate_full_site(resume or {}, model=(req.model or None))
+            if ai_site and isinstance(ai_site.get("index_html"), str) and isinstance(ai_site.get("styles_css"), str):
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as z:
+                    z.writestr("index.html", ai_site["index_html"])
+                    z.writestr("styles.css", ai_site["styles_css"])
+                    if req.include_vercel:
+                        z.writestr("vercel.json", "{\n  \"rewrites\": [{ \"source\": \"(.*)\", \"destination\": \"/index.html\" }]\n}\n")
+                buf.seek(0)
+                data = buf.read()
+            else:
+                # Fallback to templated builder
+                enriched = _enrich_with_ai(resume or {}, model=(req.model or None)) if req.ai else None
+                data = _build_site(resume or {}, include_vercel=req.include_vercel, enriched=enriched)
+        else:
+            # Legacy path: template with optional enrichment
+            enriched = _enrich_with_ai(resume or {}, model=(req.model or None)) if req.ai else None
+            data = _build_site(resume or {}, include_vercel=req.include_vercel, enriched=enriched)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate: {e}")
 

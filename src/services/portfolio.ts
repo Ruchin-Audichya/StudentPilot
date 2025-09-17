@@ -16,12 +16,13 @@ export interface PortfolioResume {
 export async function generatePortfolioZip(
   resume?: PortfolioResume,
   include_vercel: boolean = true,
-  options?: { ai?: boolean; model?: string }
+  options?: { ai?: boolean; model?: string; fullSiteAI?: boolean }
 ): Promise<Blob> {
   const body: any = { include_vercel };
   if (resume) body.resume = resume;
   if (options && typeof options.ai !== "undefined") body.ai = options.ai;
   if (options && options.model) body.model = options.model;
+  if (options && typeof options.fullSiteAI !== "undefined") body.full_site_ai = options.fullSiteAI;
   const res = await fetch(`${API_BASE}/api/portfolio/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
