@@ -62,6 +62,77 @@ _CURATED_CAREERS = [
     "https://careers.smartrecruiters.com/Deloitte",
 ]
 
+# Richer curated careers with lightweight metadata for resume-aware selection
+_CURATED_CAREERS_META = [
+    {"company": "NVIDIA", "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/", "roles": ["software","ml","hardware"], "skills": ["python","cuda","ml","deep","c++"], "regions": ["global"]},
+    {"company": "Google", "url": "https://careers.google.com/jobs/results/?employment_type=INTERN", "roles": ["software","data","ml","web"], "skills": ["python","java","react","ml"], "regions": ["global"]},
+    {"company": "Microsoft", "url": "https://jobs.careers.microsoft.com/global/en/search?q=intern", "roles": ["software","data","cloud","web"], "skills": ["c#","azure","python","react"], "regions": ["global"]},
+    {"company": "Deloitte", "url": "https://careers.smartrecruiters.com/Deloitte", "roles": ["data","analytics","consulting"], "skills": ["excel","powerbi","sql","python"], "regions": ["global","india"]},
+    {"company": "Infosys", "url": "https://careers.infosys.com/jobs/Search?query=intern", "roles": ["software","web","data"], "skills": ["java","python","react"], "regions": ["india","global"]},
+    {"company": "TCS", "url": "https://www.tcs.com/careers/students/internships", "roles": ["software","web","data"], "skills": ["java","python","cloud"], "regions": ["india"]},
+    {"company": "Wipro", "url": "https://careers.wipro.com/careers-home/jobs?keyword=intern", "roles": ["software","web","data"], "skills": ["java","python","cloud"], "regions": ["india"]},
+    {"company": "Amazon", "url": "https://www.amazon.jobs/en/search?base_query=intern&category=software-development", "roles": ["software","web","cloud"], "skills": ["java","aws","react","python"], "regions": ["global"]},
+    {"company": "Meta", "url": "https://www.metacareers.com/jobs/?q=intern", "roles": ["software","ml","web"], "skills": ["react","python","ml"], "regions": ["global"]},
+    {"company": "Adobe", "url": "https://careers.adobe.com/us/en/search-results?q=intern", "roles": ["software","design","web"], "skills": ["javascript","react","python"], "regions": ["global"]},
+]
+
+def _normalize_role_tokens(roles):
+    tokens = set()
+    for r in (roles or []):
+        rl = str(r).lower()
+        if any(k in rl for k in ("software","sde","developer","engineering","engineer","programmer","backend","frontend","fullstack")):
+            tokens.add("software")
+        if any(k in rl for k in ("data","analyst","analytics","bi","business intelligence","ds","scientist")):
+            tokens.add("data")
+        if any(k in rl for k in ("ml","machine learning","ai","deep")):
+            tokens.add("ml")
+        if any(k in rl for k in ("web","frontend","react","javascript","typescript","ui","ux")):
+            tokens.add("web")
+        if any(k in rl for k in ("cloud","devops","aws","azure","gcp","kubernetes","docker")):
+            tokens.add("cloud")
+        if any(k in rl for k in ("design","designer","ui","ux")):
+            tokens.add("design")
+    return tokens
+
+def _select_curated_careers(profile: dict, location: str, max_sites: int = 4):
+    """Pick a handful of company careers based on resume roles/skills/location.
+
+    Scoring:
+      +2 per matching normalized role token
+      +1 per overlapping skill keyword
+      +1 if region hint matches (e.g., 'india' in location and site regions)
+    """
+    try:
+        roles = list(profile.get("roles", []))
+        skills = [str(s).lower() for s in list(profile.get("skills", []))]
+        role_tokens = _normalize_role_tokens(roles)
+        loc_l = (location or "").lower()
+        region_hint = "india" if "india" in loc_l else None
+        scored = []
+        for site in _CURATED_CAREERS_META:
+            score = 0
+            # roles
+            for t in role_tokens:
+                if t in site.get("roles", []):
+                    score += 2
+            # skills
+            for s in skills[:10]:
+                if s in site.get("skills", []):
+                    score += 1
+            # region
+            if region_hint and region_hint in site.get("regions", []):
+                score += 1
+            # baseline slight preference to global brands
+            if not region_hint and "global" in site.get("regions", []):
+                score += 1
+            scored.append((score, site["url"]))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        # Keep only those with positive score, else fallback to legacy curated list
+        selected = [u for (s,u) in scored if s > 0][:max_sites]
+        return selected or _CURATED_CAREERS[:max_sites]
+    except Exception:
+        return _CURATED_CAREERS[:max_sites]
+
 # -----------------------------
 # AI / OpenRouter Configuration
 # -----------------------------
@@ -846,9 +917,13 @@ def search_internships(req: SearchRequest, request: Request):
                     futures.append(executor.submit(linkedin_fetch, q, location))
                 except Exception:
                     pass
-        # Also kick off a few curated company careers scrapes for top brands (fast, best-effort)
+        # Also kick off curated company careers scrapes informed by resume roles/skills/location
         if scrape_company_careers:
-            for cu in _CURATED_CAREERS[:4]:  # keep small to preserve latency
+            try:
+                selected_sites = _select_curated_careers(active_profile, location, max_sites=4)
+            except Exception:
+                selected_sites = _CURATED_CAREERS[:4]
+            for cu in selected_sites:
                 futures.append(executor.submit(scrape_company_careers, cu, 25))
         # Wait up to the time budget for any results
         done, pending = wait(futures, timeout=time_budget_s)
