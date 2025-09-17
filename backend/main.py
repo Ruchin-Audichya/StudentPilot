@@ -75,6 +75,48 @@ app = FastAPI()
 @app.get("/")
 def root():
     return {"app": "StudentPilot API", "health": "/health", "endpoints": ["/api/search", "/api/upload-resume", "/api/chat"], "status": "ok"}
+# Mount modular routers
+try:
+    from routes.company_scraper import router as company_scraper_router  # type: ignore
+    app.include_router(company_scraper_router)
+except Exception:
+    # Router is optional; app must still boot even if import fails in constrained envs
+    pass
+try:
+    from routes.linkedin_tools import router as linkedin_tools_router  # type: ignore
+    app.include_router(linkedin_tools_router)
+except Exception:
+    pass
+try:
+    from routes.resume_analyzer import router as resume_analyzer_router  # type: ignore
+    app.include_router(resume_analyzer_router)
+except Exception:
+    pass
+try:
+    from routes.messages import router as messages_router  # type: ignore
+    app.include_router(messages_router)
+except Exception:
+    pass
+try:
+    from routes.recommendations import router as recommendations_router  # type: ignore
+    app.include_router(recommendations_router)
+except Exception:
+    pass
+try:
+    from routes.portfolio import router as portfolio_router  # type: ignore
+    app.include_router(portfolio_router)
+except Exception:
+    pass
+try:
+    from routes.testimonials import router as testimonials_router  # type: ignore
+    app.include_router(testimonials_router)
+except Exception:
+    pass
+try:
+    from routes.mock_interview import router as mock_interview_router  # type: ignore
+    app.include_router(mock_interview_router)
+except Exception:
+    pass
 # CORS: default to permissive for public API usage; can be restricted via env if needed.
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 if _cors_env:

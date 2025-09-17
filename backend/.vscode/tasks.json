@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run backend smoke tests",
+			"type": "shell",
+			"command": "pytest -q",
+			"problemMatcher": [
+				"$pytest-python"
+			]
+		}
+	]
+}

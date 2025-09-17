@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaGithub, FaLinkedin } from "react-icons/fa";
 import { FileText, Sparkles, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 import resumeImg from "@/assets/resume.png"; // Using PNG for the resume image
+import HireProofModal from "@/components/HireProofModal";
+import { fetchTestimonials, Testimonial } from "@/services/testimonials";
 import { Link } from "react-router-dom";
 
 export default function Landing() {
   const [showLinkedInMenu, setShowLinkedInMenu] = useState(false);
+  const [hireModalOpen, setHireModalOpen] = useState(false);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [loadingTestimonials, setLoadingTestimonials] = useState(false);
 
   const handleLinkedInClick = () => {
     setShowLinkedInMenu(!showLinkedInMenu);
@@ -16,6 +21,14 @@ export default function Landing() {
     window.open(url, "_blank");
     setShowLinkedInMenu(false);
   };
+
+  useEffect(() => {
+    setLoadingTestimonials(true);
+    fetchTestimonials()
+      .then(setTestimonials)
+      .catch(() => {})
+      .finally(() => setLoadingTestimonials(false));
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -27,6 +40,13 @@ export default function Landing() {
           </h1>
           <div className="flex flex-wrap items-center gap-3 sm:gap-5">
             <Link to="/onboarding" className="hover:text-gray-300 text-sm sm:text-base">Use The Tool</Link>
+            <button
+              onClick={() => setHireModalOpen(true)}
+              className="hover:text-gray-300 text-sm sm:text-base"
+              title="Share your success story"
+            >
+              Got Hired via FindMyStipend?
+            </button>
             <a
               href="https://github.com/Ruchin-Audichya/StudentPilot"
               target="_blank"
@@ -168,10 +188,44 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 md:py-14">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg sm:text-xl font-bold">Real students. Real hires.</h3>
+          <button onClick={() => setHireModalOpen(true)} className="text-sm text-gray-300 hover:text-white">Share yours →</button>
+        </div>
+        {loadingTestimonials && <p className="text-gray-400 text-sm">Loading testimonials…</p>}
+        {!loadingTestimonials && testimonials.length === 0 && (
+          <p className="text-gray-400 text-sm">Be the first to share your success! 🎉</p>
+        )}
+        {!loadingTestimonials && testimonials.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {testimonials.slice(0,6).map(t => (
+              <div key={t.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                {t.image_url && (
+                  <div className="mb-3 overflow-hidden rounded-md">
+                    <img src={t.image_url} alt="proof" className="w-full h-40 object-cover blur-[1px]" />
+                  </div>
+                )}
+                <div className="text-sm text-gray-300">{t.message}</div>
+                <div className="mt-2 text-xs text-gray-400">
+                  — {t.name}{t.role ? ` · ${t.role}` : ''}{t.company ? ` @ ${t.company}` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* Footer */}
       <footer className="text-center py-6 text-gray-500 text-xs sm:text-sm">
         {/* Footer intentionally minimal */}
       </footer>
+
+      <HireProofModal open={hireModalOpen} onClose={() => setHireModalOpen(false)} onSubmitted={() => {
+        // refresh testimonials after submission
+        fetchTestimonials().then(setTestimonials).catch(() => {});
+      }} />
     </div>
   );
 }

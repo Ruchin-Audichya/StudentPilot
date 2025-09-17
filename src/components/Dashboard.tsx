@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import ChatWidget from "./ChatWidget";
 import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
+import { analyzeResumeAgainstJobs, toAnalyzeJobInputs, AnalyzerResponse } from "@/services/analyzer";
+import { fetchHRLinks } from "@/services/hrLinks";
+import { generatePortfolioZip, downloadBlob } from "@/services/portfolio";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import JobCard from "@/components/JobCard";
 import BackendDebug from "@/components/BackendDebug";
@@ -52,7 +55,12 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [interests, setInterests] = useState<string[]>(effective.interests || []);
   const [location, setLocation] = useState<string>("India");
   const [results, setResults] = useState<JobResult[]>([]);
+  const [analysis, setAnalysis] = useState<AnalyzerResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [hrLoading, setHrLoading] = useState(false);
+  const [hrLinks, setHrLinks] = useState<string[]>([]);
+  const [generatingPortfolio, setGeneratingPortfolio] = useState(false);
   const [onlyPaid, setOnlyPaid] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
   const [minScore, setMinScore] = useState<number>(0);
@@ -173,6 +181,32 @@ export default function Dashboard({ profile }: DashboardProps) {
     try {
       const jobs = await searchInternships({ skills, interests, location });
       setResults(jobs);
+      // Kick off analyzer in background if we have a resume in session
+      setAnalyzing(true);
+      try {
+        const resp = await analyzeResumeAgainstJobs({ jobs: toAnalyzeJobInputs(jobs), use_ai: true });
+        setAnalysis(resp);
+      } catch (e) {
+        console.warn("Analyzer failed", e);
+      } finally {
+        setAnalyzing(false);
+      }
+      // Fetch HR links in parallel
+      setHrLoading(true);
+      try {
+        const resp = await fetchHRLinks({
+          // Provide explicit filters when available; server will fallback to session resume
+          skills: skills.length ? skills : undefined,
+          roles: (suggestedRoles && suggestedRoles.length) ? suggestedRoles.slice(0, 3) : undefined,
+          location: location || undefined,
+          limit: 8,
+        });
+        setHrLinks(resp.links || []);
+      } catch (e) {
+        console.warn("HR links fetch failed", e);
+      } finally {
+        setHrLoading(false);
+      }
     } catch (err) {
       console.error("Search failed", err);
     } finally {
@@ -205,6 +239,18 @@ export default function Dashboard({ profile }: DashboardProps) {
       const data = await res.json();
       console.log("Resume upload:", data);
       if (res.ok) setUploaded(true);
+      // If we already have results, analyze them now
+      if (res.ok && results.length > 0) {
+        setAnalyzing(true);
+        try {
+          const resp = await analyzeResumeAgainstJobs({ jobs: toAnalyzeJobInputs(results), use_ai: true });
+          setAnalysis(resp);
+        } catch (e) {
+          console.warn("Analyzer after upload failed", e);
+        } finally {
+          setAnalyzing(false);
+        }
+      }
     } catch (err) {
       console.error("Upload failed", err);
     } finally {
@@ -462,6 +508,140 @@ export default function Dashboard({ profile }: DashboardProps) {
               </div>
             )}
 
+            {/* Suggestions panel */}
+            {(analysis || analyzing) && (
+              <div className="glass-card rounded-2xl p-4 border border-card-border/80">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-semibold">Resume Suggestions</h3>
+                  {analyzing && (
+                    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="inline-block h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      Analyzing…
+                    </span>
+                  )}
+                </div>
+                {analysis && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Top Missing Keywords</div>
+                      <div className="flex flex-wrap gap-2">
+                        {(analysis.suggestions || []).slice(0, 8).map((s, i) => (
+                          <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                            + {s}
+                          </span>
+                        ))}
+                        {analysis.suggestions?.length === 0 && (
+                          <span className="text-xs text-muted-foreground">No gaps detected.</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">AI Weak Points</div>
+                      <ul className="text-sm space-y-1 list-disc pl-4">
+                        {(analysis.ai?.weak_points || []).slice(0, 5).map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                        {(!analysis.ai || (analysis.ai.weak_points || []).length === 0) && (
+                          <li className="text-muted-foreground">Nothing major found.</li>
+                        )}
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Grammar Fixes</div>
+                      <ul className="text-sm space-y-1">
+                        {(analysis.ai?.grammar_fixes || []).slice(0, 4).map((g, i) => (
+                          <li key={i}>
+                            <span className="opacity-80">{g.issue}</span>
+                            <span className="opacity-60"> → </span>
+                            <span className="font-medium">{g.suggestion}</span>
+                          </li>
+                        ))}
+                        {(!analysis.ai || (analysis.ai.grammar_fixes || []).length === 0) && (
+                          <li className="text-muted-foreground">Looks good.</li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* HR Connect panel */}
+            <div className="glass-card rounded-2xl p-4 border border-card-border/80">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold">Connect with HR / Recruiters</h3>
+                {hrLoading && (
+                  <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-block h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Searching…
+                  </span>
+                )}
+              </div>
+              {hrLinks.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {hrLinks.map((u, i) => (
+                    <a
+                      key={i}
+                      href={u}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
+                      title="Open LinkedIn search"
+                    >
+                      HR search {i + 1}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No HR links yet. Run a search to populate.</p>
+              )}
+            </div>
+
+            {/* Portfolio generator panel */}
+            <div className="glass-card rounded-2xl p-4 border border-card-border/80">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold">Instant Portfolio Website</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Turn your resume into a simple portfolio. Download a ready-to-deploy ZIP (GitHub Pages or Vercel).
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  className={`btn ${generatingPortfolio ? 'opacity-70 cursor-not-allowed' : 'btn-primary'} hover-lift`}
+                  disabled={generatingPortfolio}
+                  onClick={async () => {
+                    setGeneratingPortfolio(true);
+                    try {
+                      const blob = await generatePortfolioZip();
+                      downloadBlob(blob, 'portfolio.zip');
+                    } catch (e) {
+                      console.error('Portfolio generation failed', e);
+                    } finally {
+                      setGeneratingPortfolio(false);
+                    }
+                  }}
+                >
+                  {generatingPortfolio ? 'Generating…' : 'Generate Portfolio'}
+                </button>
+                <a
+                  href="https://pages.github.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
+                >
+                  GitHub Pages Guide
+                </a>
+                <a
+                  href="https://vercel.com/docs/deployments/overview"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
+                >
+                  Deploy to Vercel
+                </a>
+              </div>
+            </div>
+
             <motion.div
               className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-[1fr]"
               variants={listVariants}
@@ -470,7 +650,18 @@ export default function Dashboard({ profile }: DashboardProps) {
               layout
             >
               <AnimatePresence initial={false}>
-                {derivedResults.map((job) => (
+                {derivedResults.map((job) => {
+                  // Attach analyzer missing keywords by matching title+company
+                  const missing = (() => {
+                    const a = analysis?.results || [];
+                    const found = a.find((r) =>
+                      r.title?.toLowerCase() === (job.title || "").toLowerCase() &&
+                      (r.company || "").toLowerCase() === (job.company || "").toLowerCase()
+                    );
+                    return found?.missing_keywords || [];
+                  })();
+                  const enriched = { ...(job as any), missing_keywords: missing } as any;
+                  return (
                   <motion.div
                     layout
                     key={job.id}
@@ -480,9 +671,10 @@ export default function Dashboard({ profile }: DashboardProps) {
                     exit="exit"
                     style={{ willChange: "transform, opacity" }}
                   >
-                    <JobCard job={job} />
+                    <JobCard job={enriched} />
                   </motion.div>
-                ))}
+                  );
+                })}
               </AnimatePresence>
             </motion.div>
           </div>

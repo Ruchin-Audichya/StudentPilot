@@ -1,4 +1,6 @@
 import { memo } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { JobResult } from "@/services/jobApi";
 
 type Props = { job: JobResult };
@@ -26,8 +28,18 @@ export default memo(function JobCard({ job }: Props) {
   if (hay.includes("hybrid")) tagList.push("hybrid");
   if (hay.includes("onsite") || hay.includes("on-site")) tagList.push("onsite");
 
+  const applyHref = (job.url || (job as any).apply_url || (job as any).applyUrl || "").toString();
+  const missing: string[] | undefined = (job as any).missing_keywords;
+
   return (
-    <div className="relative glass-card rounded-2xl p-5 hover-lift group animate-fade-in h-full flex flex-col">
+    <motion.div
+      className="relative glass-card rounded-2xl p-5 group h-full flex flex-col"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -3 }}
+      whileTap={{ y: -1 }}
+    >
       {/* Hot badge (top-left) */}
       {hot && (
         <span className="absolute -top-2 -left-2 text-[10px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/30 shadow-sm">
@@ -90,6 +102,21 @@ export default memo(function JobCard({ job }: Props) {
         </div>
       )}
 
+      {/* Top missing keywords from analyzer */}
+      {missing && missing.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {missing.slice(0, 4).map((t, i) => (
+            <span
+              key={`mk-${i}`}
+              className="text-[11px] px-2 py-0.5 rounded-full border bg-rose-500/10 text-rose-300 border-rose-500/30"
+              title="Add to resume to improve ATS"
+            >
+              + {t}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Derived simple tags */}
       {tagList.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
@@ -106,22 +133,17 @@ export default memo(function JobCard({ job }: Props) {
         </div>
       )}
 
-  <div className="mt-auto pt-4 flex items-center justify-between">
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full px-4 py-2 gradient-primary text-white hover:opacity-95 transition shadow-sm group-hover:shadow"
-        >
-          Apply Now
-        </a>
+      <div className="mt-auto pt-4 flex items-center justify-between">
+        <Button asChild className="gradient-primary text-white">
+          <a href={applyHref || "#"} target="_blank" rel="noopener noreferrer">Apply Now</a>
+        </Button>
         <button
-          onClick={() => window.open(job.url, "_blank")}
+          onClick={() => applyHref && window.open(applyHref, "_blank")}
           className="text-sm px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
         >
           Details
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 });

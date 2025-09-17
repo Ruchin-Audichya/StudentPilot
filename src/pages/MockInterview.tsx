@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TopNav from "@/components/TopNav";
 import { API_BASE } from "@/lib/apiBase";
+import { startMockInterview, followupQuestion } from "@/services/mockInterview";
 
 declare global {
     interface Window {
@@ -13,7 +14,7 @@ const API_KEY = (import.meta as any)?.env?.VITE_GEMINI_API_KEY || "";
 const TEXT_GENERATION_MODEL = (import.meta as any)?.env?.VITE_GEMINI_TEXT_MODEL || "gemini-2.5-flash";
 const TTS_MODEL = (import.meta as any)?.env?.VITE_GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 
-const interviewQuestions = [
+const defaultQuestions = [
     "Tell me about yourself.",
     "Why are you interested in this internship?",
     "What are your strengths and weaknesses?",
@@ -119,6 +120,7 @@ const MockInterview = () => {
     const [isInterviewActive, setIsInterviewActive] = useState(false);
     const isInterviewActiveRef = useRef(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [questions, setQuestions] = useState<string[]>(defaultQuestions);
     const [questionDisplay, setQuestionDisplay] = useState("Click 'Start Interview' to begin.");
     const [userResponse, setUserResponse] = useState("(Your spoken answer will appear here)");
     const [aiFeedback, setAiFeedback] = useState("(Feedback on your answer will appear here)");
@@ -143,6 +145,8 @@ const MockInterview = () => {
     const noiseFloorRef = useRef<number>(0.015);
     const silenceThresholdRef = useRef<number>(0.02); // dynamic
     const bargeInRmsRef = useRef<number>(0.04); // dynamic
+    // Q/A transcript to inform follow-up questions
+    const transcriptRef = useRef<{ q: string; a: string }[]>([]);
     const BARGE_IN_CONSEC_FRAMES = 3; // consecutive frames above threshold
 
     const stopQuestionTTS = useCallback(() => {
@@ -406,8 +410,22 @@ const MockInterview = () => {
             answerLockedRef.current = true; // freeze displayed answer for this question
             const finalAnswer = (latestTranscriptRef.current || '').trim();
             if (finalAnswer) {
-                await getAIResponse(interviewQuestions[currentQuestionIndex], finalAnswer);
+                const askedQ = questions[currentQuestionIndex] || questionDisplay;
+                await getAIResponse(askedQ, finalAnswer);
                 setBodyLanguageFeedback(getSimulatedBodyLanguageFeedback());
+                // Save transcript and request a smarter next question
+                try {
+                    transcriptRef.current = [...transcriptRef.current, { q: askedQ, a: finalAnswer }];
+                    const fu = await followupQuestion({ last_question: askedQ, user_answer: finalAnswer, transcript: transcriptRef.current.slice(-4) });
+                    if (fu?.next_question) {
+                        setQuestions(prev => {
+                            const copy = prev.slice();
+                            const nextIdx = currentQuestionIndex + 1;
+                            if (nextIdx < copy.length) copy[nextIdx] = fu.next_question;
+                            return copy;
+                        });
+                    }
+                } catch {}
                 // Post-processing UX polish only; no auto-advance to avoid unexpected TTS
                 setTimeout(() => { try { (document.activeElement as HTMLElement)?.blur?.(); } catch {}; }, 100);
                 setTimeout(() => { try { (document.documentElement as any).scrollTop = 0; } catch {}; }, 150);
@@ -467,14 +485,14 @@ const MockInterview = () => {
     // Ask the current question (Now `endInterview` is defined)
     const askQuestion = useCallback(async () => {
         if (!isInterviewActiveRef.current) return;
-        if (currentQuestionIndex < interviewQuestions.length) {
+        if (currentQuestionIndex < questions.length) {
             setPhase('question');
             setQuestionDisplay("Interviewer is thinking...");
             setUserResponse("");
             setAiFeedback("");
             setBodyLanguageFeedback("");
 
-        const question = interviewQuestions[currentQuestionIndex];
+        const question = questions[currentQuestionIndex];
         setQuestionDisplay(question); // Display text immediately as fallback
         await speakQuestion(question);
             if (speechRecognitionRef.current) {
@@ -499,7 +517,9 @@ const MockInterview = () => {
         if (isInterviewActive) return;
 
         // Reset previous state
-        setCurrentQuestionIndex(0);
+    setCurrentQuestionIndex(0);
+    setQuestions(defaultQuestions);
+    transcriptRef.current = [];
         setQuestionDisplay("Click 'Start Interview' to begin.");
         setUserResponse("(Your spoken answer will appear here)");
         setAiFeedback("(Feedback on your answer will appear here)");
@@ -619,6 +639,15 @@ const MockInterview = () => {
             silenceThresholdRef.current = 0.02;
             bargeInRmsRef.current = 0.04;
             initializeSpeechRecognition();
+            // Fetch resume-tailored questions (5-6) before asking
+            try {
+                setStatusMessage('Preparing interview questions…');
+                const resp = await startMockInterview({ count: 6 });
+                const qs = (resp?.questions || []).filter(Boolean);
+                setQuestions(qs.length ? qs : defaultQuestions);
+            } catch {
+                setQuestions(defaultQuestions);
+            }
             await askQuestion();
 
         } catch (err) {
