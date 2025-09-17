@@ -24,6 +24,7 @@ def _enhance_query(query: str) -> str:
 def _build_search_url(query: str, location: Optional[str]) -> str:
     from urllib.parse import quote
     q = quote(" ".join(query.split()))
+    # f_E=1,2 targets entry/associate; add f_AL=true to emphasize Easy Apply on one variant
     url = f"https://www.linkedin.com/jobs/search/?keywords={q}&f_E=1,2&f_I=4,6,96,3"
     if location:
         url += f"&location={quote(location)}"
@@ -52,7 +53,7 @@ def _http_fetch(url: str, timeout: float = 12.0) -> Optional[str]:
 
 def _parse_cards(html: str, limit: int) -> List[Dict]:
     soup = BeautifulSoup(html, "html.parser")
-    cards = soup.select("div.base-card")[:limit]
+    cards = soup.select("div.base-card")[: max(limit, 20)]
     out: List[Dict] = []
     for card in cards:
         title_tag = card.select_one("h3.base-search-card__title")
@@ -63,7 +64,13 @@ def _parse_cards(html: str, limit: int) -> List[Dict]:
         apply_url = link_tag.get("href") if link_tag else None
         loc_tag = card.select_one("span.job-search-card__location")
         location = loc_tag.get_text(strip=True) if loc_tag else None
-        desc = card.get_text(" ", strip=True)[:280]
+        # Prefer a compact snippet area if present
+        snippet_tag = card.select_one("div.base-search-card__metadata") or card
+        desc = snippet_tag.get_text(" ", strip=True)[:320]
+
+        # Detect badges
+        badges = " ".join([b.get_text(" ", strip=True) for b in card.select("span,div") if b and b.get_text(strip=True)])
+        badges_l = badges.lower()
 
         content_lower = f"{title} {desc}".lower()
         auto_tags: List[str] = []
@@ -79,6 +86,12 @@ def _parse_cards(html: str, limit: int) -> List[Dict]:
             auto_tags.append("backend")
         if any(term in content_lower for term in ["frontend", "ui", "ux", "web"]):
             auto_tags.append("frontend")
+        if "easy apply" in badges_l or "easy apply" in content_lower:
+            auto_tags.append("easy-apply")
+        if "promoted" in badges_l or "promoted" in content_lower:
+            auto_tags.append("promoted")
+        if "actively hiring" in badges_l or "actively hiring" in content_lower:
+            auto_tags.append("actively-hiring")
 
         out.append({
             "title": title,
@@ -90,7 +103,7 @@ def _parse_cards(html: str, limit: int) -> List[Dict]:
             "tags": auto_tags,
             "source": "linkedin",
         })
-    return out
+    return out[:limit]
 
 
 def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', limit: int = 12) -> List[Dict]:
@@ -99,6 +112,8 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
 
     enhanced_query = _enhance_query(query)
     url = _build_search_url(enhanced_query, location)
+    # Also prepare an Easy Apply variant to increase premium-quality results
+    url_easy = url + "&f_AL=true"
 
     # First try light HTTP fetch (fast and resource-friendly)
     html = _http_fetch(url)
@@ -107,6 +122,12 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
         results = _parse_cards(html, limit)
         if results:
             return results
+    # Try Easy Apply variant quickly
+    html_e = _http_fetch(url_easy)
+    if html_e:
+        r2 = _parse_cards(html_e, limit)
+        if r2:
+            return r2
 
     # Optional Playwright fallback (headless, still lighter than full Selenium)
     try:
@@ -129,7 +150,7 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
             page = context.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=20000)
             # Attempt minimal scroll to trigger content hydration
-            for _ in range(2):
+            for _ in range(3):
                 page.mouse.wheel(0, 2000)
                 time.sleep(0.8)
             html2 = page.content()
@@ -138,6 +159,21 @@ def fetch_linkedin_internships(query: str, location: Optional[str] = 'India', li
             pw = _parse_cards(html2, limit)
             if pw:
                 return pw
+        # Playwright second pass: Easy Apply variant
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(viewport={"width": 1366, "height": 900})
+            page = context.new_page()
+            page.goto(url_easy, wait_until="domcontentloaded", timeout=20000)
+            for _ in range(3):
+                page.mouse.wheel(0, 2000)
+                time.sleep(0.8)
+            html3 = page.content()
+            browser.close()
+        if html3:
+            pw2 = _parse_cards(html3, limit)
+            if pw2:
+                return pw2
     except Exception:
         # Swallow and return whatever we have
         pass

@@ -106,6 +106,17 @@ def _build_site(resume: Dict[str, Any], include_vercel: bool = True, enriched: O
             parts.append(f'<article class="card"><h3>{degree} – {school}</h3>' + (f'<div class="period">{period}</div>' if period else '') + '</article>')
         return '<section id="education"><h2>Education</h2>' + ''.join(parts) + '</section>'
 
+    # Determine resume download link from links (common labels) and LinkedIn profile link
+    resume_link = ""
+    linkedin_link = "https://www.linkedin.com"
+    for l in links:
+        label = (l.get("label") or "").lower()
+        url = _html_escape(l.get("url") or "")
+        if not resume_link and ("resume" in label or "cv" in label):
+            resume_link = url
+        if "linkedin" in label and url:
+            linkedin_link = url
+
     index_html = f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -120,8 +131,13 @@ def _build_site(resume: Dict[str, Any], include_vercel: bool = True, enriched: O
       <div class=\"hero-inner\">
         <h1>{name}</h1>
         <div class=\"meta\">{location}{' • ' if location and (email or phone) else ''}{email}{' • ' if email and phone else ''}{phone}</div>
-        {f'<p class=\"summary\">{summary}</p>' if summary else ''}
-        {_link_tags(links)}
+                {f'<p class=\"summary\">{summary}</p>' if summary else ''}
+                <div class=\"cta\"> 
+                    {f'<a class=\"btn primary\" href=\"{_html_escape(linkedin_link)}\" target=\"_blank\">Connect on LinkedIn</a>'}
+                    {f'<a class=\"btn\" href=\"mailto:{email}\">Email Me</a>' if email else ''}
+                    {f'<a class=\"btn\" href=\"{resume_link}\" target=\"_blank\">Download Resume</a>' if resume_link else ''}
+                </div>
+                {_link_tags(links)}
       </div>
     </header>
 
@@ -143,11 +159,16 @@ def _build_site(resume: Dict[str, Any], include_vercel: bool = True, enriched: O
 body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#14233b,#0b0f17 40%);color:#e6edf3}
 .container{max-width:980px;margin:0 auto;padding:32px}
 .hero{position:relative;border:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,rgba(131,201,255,.06),rgba(255,255,255,.02));padding:26px;border-radius:16px;overflow:hidden;margin-bottom:24px}
-.hero-bg{position:absolute;inset:-20px;background:radial-gradient(600px 200px at 0% 0%,rgba(131,201,255,.08),transparent),radial-gradient(400px 200px at 100% -10%,rgba(255,163,163,.10),transparent)}
+.hero-bg{position:absolute;inset:-20px;background:radial-gradient(600px 200px at 0% 0%,rgba(131,201,255,.08),transparent),radial-gradient(400px 200px at 100% -10%,rgba(255,163,163,.10),transparent);filter:blur(6px);animation:pulse 6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:.9;transform:scale(1.02)}}
 .hero-inner{position:relative}
 h1{margin:0 0 6px 0;font-size:32px}
 .meta{opacity:.8;font-size:14px;margin-bottom:8px}
 .summary{opacity:.95;max-width:70ch}
+.cta{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#e6edf3;text-decoration:none;transition:.2s ease}
+.btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.08)}
+.btn.primary{border-color:rgba(131,201,255,.35);background:rgba(131,201,255,.10);color:#bfe6ff}
 .links{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .links a{color:#83c9ff;text-decoration:none;border:1px solid rgba(131,201,255,.25);padding:6px 10px;border-radius:999px;background:rgba(131,201,255,.05)}
 .links a:hover{background:rgba(131,201,255,.10)}
@@ -155,7 +176,8 @@ h2{font-size:20px;margin:26px 0 12px 0}
 section{margin-bottom:16px}
 .tags{list-style:none;display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0}
 .tags li{font-size:12px;border:1px solid rgba(255,255,255,.15);padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.04)}
-.card{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.03);padding:14px 16px;border-radius:12px;margin-bottom:12px}
+.card{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.03);padding:14px 16px;border-radius:12px;margin-bottom:12px;transition:.2s ease}
+.card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .card h3{margin:0 0 6px 0;font-size:16px}
 .muted{opacity:.9}
 .period{opacity:.7;font-size:12px;margin-bottom:4px}
