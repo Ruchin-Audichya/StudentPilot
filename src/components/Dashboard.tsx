@@ -6,6 +6,7 @@ import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
 import { analyzeResumeAgainstJobs, toAnalyzeJobInputs, AnalyzerResponse } from "@/services/analyzer";
 import { fetchHRLinks } from "@/services/hrLinks";
+import { fetchHRProfiles, HRProfileLink } from "@/services/hrProfiles";
 import { generatePortfolioZip, downloadBlob } from "@/services/portfolio";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import JobCard from "@/components/JobCard";
@@ -59,13 +60,15 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [hrLoading, setHrLoading] = useState(false);
-  const [hrLinks, setHrLinks] = useState<string[]>([]);
+  const [hrLinks, setHrLinks] = useState<{ label: string; url: string }[]>([]);
+  const [hrProfiles, setHrProfiles] = useState<HRProfileLink[]>([]);
   const [generatingPortfolio, setGeneratingPortfolio] = useState(false);
   const [onlyPaid, setOnlyPaid] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
   const [minScore, setMinScore] = useState<number>(0);
   const [sortBy, setSortBy] = useState<"scoreDesc" | "source" | "recent">("scoreDesc");
   const [autoSearch, setAutoSearch] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "ats" | "linkedin" | "internshala">("all");
 
   // Suggestions from parsed resume (if uploaded)
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
@@ -191,7 +194,7 @@ export default function Dashboard({ profile }: DashboardProps) {
       } finally {
         setAnalyzing(false);
       }
-      // Fetch HR links in parallel
+  // Fetch HR links in parallel
       setHrLoading(true);
       try {
         const resp = await fetchHRLinks({
@@ -201,11 +204,27 @@ export default function Dashboard({ profile }: DashboardProps) {
           location: location || undefined,
           limit: 8,
         });
-        setHrLinks(resp.links || []);
+        // Backward compat: resp.links can be array of strings or objects
+        const links = Array.isArray((resp as any).links)
+          ? (resp as any).links.map((x: any, i: number) => (typeof x === 'string' ? { label: `HR search ${i+1}`, url: x } : x))
+          : [];
+        setHrLinks(links);
       } catch (e) {
         console.warn("HR links fetch failed", e);
       } finally {
         setHrLoading(false);
+      }
+      // Fetch HR profiles for a notable company in results (prefer ATS sources)
+      try {
+        const preferred = jobs.find(j => (j.source||"").match(/lever|greenhouse|workday|smartrecruiters|company-careers|generic/i)) || jobs[0];
+        if (preferred?.company) {
+          const profs = await fetchHRProfiles({ company: preferred.company, roles: suggestedRoles.slice(0,2), location, skills: skills.slice(0,3), limit: 6 });
+          setHrProfiles(profs);
+        } else {
+          setHrProfiles([]);
+        }
+      } catch (e) {
+        console.warn("HR profiles fetch failed", e);
       }
     } catch (err) {
       console.error("Search failed", err);
@@ -291,6 +310,14 @@ export default function Dashboard({ profile }: DashboardProps) {
   // Derived client-side filtered/sorted view
   const derivedResults = useMemo(() => {
     let arr = results.slice();
+    // Source filter first
+    const isATS = (src?: string) => {
+      const s = (src || "").toLowerCase();
+      return ["lever","greenhouse","workday","smartrecruiters","company-careers","generic"].some(k => s.includes(k));
+    };
+    if (sourceFilter === "linkedin") arr = arr.filter(j => (j.source || "").toLowerCase().includes("linkedin"));
+    else if (sourceFilter === "internshala") arr = arr.filter(j => (j.source || "").toLowerCase().includes("internshala"));
+    else if (sourceFilter === "ats") arr = arr.filter(j => isATS(j.source));
     if (onlyPaid) arr = arr.filter((j) => !!(j.stipend && String(j.stipend).trim()));
     if (onlyNew) arr = arr.filter((j) => j.is_new);
     if (minScore > 0) arr = arr.filter((j) => (j.score ?? 0) >= minScore);
@@ -298,7 +325,23 @@ export default function Dashboard({ profile }: DashboardProps) {
     else if (sortBy === "source") arr.sort((a, b) => (a.source || "").localeCompare(b.source || ""));
     // 'recent' is backend-dependent; keep original order as scraped
     return arr;
-  }, [results, onlyPaid, onlyNew, minScore, sortBy]);
+  }, [results, sourceFilter, onlyPaid, onlyNew, minScore, sortBy]);
+
+  // Source counts for quick breakdown label
+  const sourceCounts = useMemo(() => {
+    const counts = { linkedin: 0, internshala: 0, ats: 0 };
+    const isATS = (src?: string) => {
+      const s = (src || "").toLowerCase();
+      return ["lever","greenhouse","workday","smartrecruiters","company-careers","generic"].some(k => s.includes(k));
+    };
+    for (const j of results) {
+      const s = (j.source || "").toLowerCase();
+      if (s.includes("linkedin")) counts.linkedin++;
+      else if (s.includes("internshala")) counts.internshala++;
+      else if (isATS(s)) counts.ats++;
+    }
+    return counts;
+  }, [results]);
 
   function useTopFromResume() {
     const top = suggestedSkills.slice(0, 5);
@@ -473,9 +516,29 @@ export default function Dashboard({ profile }: DashboardProps) {
                   </span>
                 )}
               </h2>
-              <span className="text-sm text-muted-foreground">
-                {loading ? '—' : `${derivedResults.length} matches`}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground hidden sm:inline">
+                  {loading ? '-' : `${derivedResults.length} matches`}
+                </span>
+                <div className="text-[11px] text-muted-foreground">
+                  <span className="mr-2">Sources:</span>
+                  <span className="mr-2">LinkedIn {sourceCounts.linkedin}</span>
+                  <span className="mr-2">ATS {sourceCounts.ats}</span>
+                  <span>Internshala {sourceCounts.internshala}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {(["all","ats","linkedin","internshala"] as const).map(k => (
+                    <button
+                      key={k}
+                      onClick={() => setSourceFilter(k)}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition ${sourceFilter===k ? 'bg-white/15 border-white/30' : 'bg-white/5 border-card-border hover:bg-white/10'}`}
+                      title={`Show ${k}`}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <span className="sr-only" aria-live="polite">
@@ -577,24 +640,35 @@ export default function Dashboard({ profile }: DashboardProps) {
                   </span>
                 )}
               </div>
-              {hrLinks.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {hrLinks.map((u, i) => (
-                    <a
-                      key={i}
-                      href={u}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
-                      title="Open LinkedIn search"
-                    >
-                      HR search {i + 1}
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No HR links yet. Run a search to populate.</p>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {hrLinks.map((l, i) => (
+                  <a
+                    key={`hrl-${i}`}
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
+                    title="Open LinkedIn people search"
+                  >
+                    {l.label || `HR search ${i+1}`}
+                  </a>
+                ))}
+                {hrProfiles.map((p, i) => (
+                  <a
+                    key={`hrp-${i}`}
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/15 text-emerald-200 transition"
+                    title="Open LinkedIn profile"
+                  >
+                    {p.label || `Recruiter ${i+1}`}
+                  </a>
+                ))}
+                {hrLinks.length === 0 && hrProfiles.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No HR links yet. Run a search to populate.</p>
+                )}
+              </div>
             </div>
 
             {/* Portfolio generator panel */}

@@ -44,6 +44,24 @@ def _maybe_import_linkedin():
     except Exception:
         return lambda *a, **k: []  # graceful no-op
 
+# Company careers scraper integration
+try:
+    from routes.company_scraper import scrape_company_careers  # type: ignore
+except Exception:
+    scrape_company_careers = None  # type: ignore
+
+# Small curated map of well-known companies -> careers roots (ATS-hosted where possible)
+_CURATED_CAREERS = [
+    # NVIDIA (Workday hosted board)
+    "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/",
+    # Google internships filter
+    "https://careers.google.com/jobs/results/?employment_type=INTERN",
+    # Microsoft search for interns
+    "https://jobs.careers.microsoft.com/global/en/search?q=intern",
+    # Deloitte SmartRecruiters (global)
+    "https://careers.smartrecruiters.com/Deloitte",
+]
+
 # -----------------------------
 # AI / OpenRouter Configuration
 # -----------------------------
@@ -828,6 +846,10 @@ def search_internships(req: SearchRequest, request: Request):
                     futures.append(executor.submit(linkedin_fetch, q, location))
                 except Exception:
                     pass
+        # Also kick off a few curated company careers scrapes for top brands (fast, best-effort)
+        if scrape_company_careers:
+            for cu in _CURATED_CAREERS[:4]:  # keep small to preserve latency
+                futures.append(executor.submit(scrape_company_careers, cu, 25))
         # Wait up to the time budget for any results
         done, pending = wait(futures, timeout=time_budget_s)
         for f in done:

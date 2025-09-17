@@ -5,8 +5,10 @@ from pydantic import BaseModel
 
 try:
     from utils.linkedin_hr import generate_hr_search_links
+    from utils.linkedin_profiles import search_hr_profiles
 except Exception as e:  # pragma: no cover
     generate_hr_search_links = None
+    search_hr_profiles = None
     _IMPORT_ERR = e
 else:
     _IMPORT_ERR = None
@@ -72,3 +74,36 @@ def hr_links(req: HRLinksRequest, request: Request) -> Dict:
 
     links = generate_hr_search_links(skills=skills, roles=roles, location=location, limit=req.limit or 10)  # type: ignore
     return {"links": links, "from": "explicit" if (req.skills or req.roles or req.location) else ("resume_text" if req.resume_text else "session")}
+
+
+class HRProfilesRequest(BaseModel):
+    company: Optional[str] = None
+    roles: Optional[List[str]] = None
+    location: Optional[str] = None
+    skills: Optional[List[str]] = None
+    limit: Optional[int] = 8
+
+
+@router.post("/hr-profiles")
+def hr_profiles(req: HRProfilesRequest, request: Request) -> Dict:
+    if _IMPORT_ERR:
+        raise HTTPException(status_code=500, detail=f"linkedin tools unavailable: {_IMPORT_ERR}")
+    company = (req.company or "").strip() or None
+    roles = req.roles or []
+    location = (req.location or "").strip() or None
+    skills = req.skills or []
+
+    # Fallback to session profile if not provided
+    if not (company or roles or location or skills):
+        try:
+            from main import _get_session_id, _get_session_profile  # type: ignore
+            sid = _get_session_id(request)
+            _text, profile = _get_session_profile(sid)
+            roles = sorted(list(profile.get("roles", []))) or roles
+            skills = sorted(list(profile.get("skills", []))) or skills
+            location = location or profile.get("location")
+        except Exception:
+            pass
+
+    items = search_hr_profiles(company=company, roles=roles, location=location, skills=skills, limit=req.limit or 8)  # type: ignore
+    return {"profiles": items}

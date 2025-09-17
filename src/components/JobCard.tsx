@@ -57,10 +57,10 @@ export default memo(function JobCard({ job }: Props) {
         <div>
           <h3 className="text-base md:text-lg font-bold">{job.title}</h3>
           <p className="text-sm text-muted-foreground">
-            {job.company} • {job.location}
+            {job.company ? `${job.company} • ` : ''}{job.location}
           </p>
         </div>
-        <span className="text-xs px-2 py-1 rounded-full bg-white/5 border border-card-border">{job.source}</span>
+        <span className="text-xs px-2 py-1 rounded-full bg-white/5 border border-card-border">{job.source || 'source'}</span>
       </div>
 
       {job.stipend && (
