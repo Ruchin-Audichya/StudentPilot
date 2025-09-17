@@ -7,6 +7,7 @@ import { searchInternships, JobResult } from "@/services/jobApi";
 import { analyzeResumeAgainstJobs, toAnalyzeJobInputs, AnalyzerResponse } from "@/services/analyzer";
 import { fetchHRLinks } from "@/services/hrLinks";
 import { fetchHRProfiles, HRProfileLink } from "@/services/hrProfiles";
+import { fetchHRProfilesBatch, HRProfilesBatchItem } from "@/services/hrProfilesBatch";
 import { generatePortfolioZip, downloadBlob } from "@/services/portfolio";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import JobCard from "@/components/JobCard";
@@ -63,6 +64,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [hrLinks, setHrLinks] = useState<{ label: string; url: string }[]>([]);
   const [hrProfiles, setHrProfiles] = useState<HRProfileLink[]>([]);
   const [hrCompany, setHrCompany] = useState<string>("");
+  const [hrBatch, setHrBatch] = useState<HRProfilesBatchItem[] | null>(null);
   const [generatingPortfolio, setGeneratingPortfolio] = useState(false);
   const [onlyPaid, setOnlyPaid] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
@@ -215,15 +217,29 @@ export default function Dashboard({ profile }: DashboardProps) {
       } finally {
         setHrLoading(false);
       }
-      // Fetch HR profiles for a notable company in results (prefer ATS sources)
+      // Fetch HR profiles for notable companies in results (prefer ATS sources)
       try {
-        const preferred = jobs.find(j => (j.source||"").match(/lever|greenhouse|workday|smartrecruiters|company-careers|generic/i)) || jobs[0];
-        if (preferred?.company) {
-          const profs = await fetchHRProfiles({ company: preferred.company, roles: suggestedRoles.slice(0,2), location, skills: skills.slice(0,3), limit: 6 });
-          setHrProfiles(profs);
-          setHrCompany(preferred.company);
-        } else {
+        const atsCompanies = Array.from(new Set(
+          jobs
+            .filter(j => (j.source||"").match(/lever|greenhouse|workday|smartrecruiters|company-careers|generic/i) && j.company)
+            .map(j => j.company as string)
+        ));
+        if (atsCompanies.length > 1) {
+          const items = await fetchHRProfilesBatch({ companies: atsCompanies.slice(0,4), roles: suggestedRoles.slice(0,2), location, skills: skills.slice(0,3), per_company_limit: 3 });
+          setHrBatch(items);
           setHrProfiles([]);
+          setHrCompany(atsCompanies[0] || "");
+        } else {
+          const preferred = jobs.find(j => (j.source||"").match(/lever|greenhouse|workday|smartrecruiters|company-careers|generic/i)) || jobs[0];
+          if (preferred?.company) {
+            const profs = await fetchHRProfiles({ company: preferred.company, roles: suggestedRoles.slice(0,2), location, skills: skills.slice(0,3), limit: 6 });
+            setHrProfiles(profs);
+            setHrCompany(preferred.company);
+            setHrBatch(null);
+          } else {
+            setHrProfiles([]);
+            setHrBatch(null);
+          }
         }
       } catch (e) {
         console.warn("HR profiles fetch failed", e);
@@ -689,8 +705,8 @@ export default function Dashboard({ profile }: DashboardProps) {
                 )}
               </div>
 
-              {/* Profile cards */}
-              {hrProfiles.length > 0 && (
+              {/* Profile cards (single company) */}
+              {hrBatch === null && hrProfiles.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {hrProfiles.map((p, i) => {
                     const label = p.label || "LinkedIn Profile";
@@ -725,6 +741,39 @@ export default function Dashboard({ profile }: DashboardProps) {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Grouped profile cards by company (batch) */}
+              {hrBatch && hrBatch.length > 0 && (
+                <div className="space-y-4">
+                  {hrBatch.map((group, gi) => (
+                    <div key={`grp-${gi}`}>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{group.company}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {group.profiles.map((p, i) => {
+                          const label = p.label || "LinkedIn Profile";
+                          const clean = label.replace(/\s*\|\s*LinkedIn.*/i, "");
+                          const parts = clean.split(/\s+-\s+/);
+                          const name = parts[0] || clean;
+                          const subtitle = parts.slice(1).join(" • ");
+                          const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join("") || "HR";
+                          return (
+                            <div key={`card-${gi}-${i}`} className="glass-card rounded-xl p-3 border border-card-border/80 flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-200 font-semibold">
+                                {initials}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{name}</div>
+                                {subtitle && <div className="text-xs text-muted-foreground truncate">{subtitle}</div>}
+                              </div>
+                              <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/15 text-emerald-200 transition whitespace-nowrap">Connect</a>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

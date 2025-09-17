@@ -107,3 +107,41 @@ def hr_profiles(req: HRProfilesRequest, request: Request) -> Dict:
 
     items = search_hr_profiles(company=company, roles=roles, location=location, skills=skills, limit=req.limit or 8)  # type: ignore
     return {"profiles": items}
+
+
+class HRProfilesBatchRequest(BaseModel):
+    companies: List[str]
+    roles: Optional[List[str]] = None
+    location: Optional[str] = None
+    skills: Optional[List[str]] = None
+    per_company_limit: Optional[int] = 3
+
+
+@router.post("/hr-profiles/batch")
+def hr_profiles_batch(req: HRProfilesBatchRequest, request: Request) -> Dict:
+    if _IMPORT_ERR:
+        raise HTTPException(status_code=500, detail=f"linkedin tools unavailable: {_IMPORT_ERR}")
+    companies = [c.strip() for c in (req.companies or []) if c and c.strip()]
+    if not companies:
+        raise HTTPException(status_code=400, detail="companies array required")
+
+    roles = req.roles or []
+    location = (req.location or "").strip() or None
+    skills = req.skills or []
+    k = max(1, min(5, int(req.per_company_limit or 3)))
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    out = []
+    with ThreadPoolExecutor(max_workers=min(6, len(companies))) as ex:
+        futs = {ex.submit(search_hr_profiles, c, roles, location, skills, k): c for c in companies}  # type: ignore
+        for fut in as_completed(futs):
+            company = futs[fut]
+            try:
+                profs = fut.result() or []
+            except Exception:
+                profs = []
+            out.append({"company": company, "profiles": profs})
+    # Keep original order of companies in response
+    order = {c: i for i, c in enumerate(companies)}
+    out.sort(key=lambda x: order.get(x.get("company"), 1_000_000))
+    return {"items": out}
