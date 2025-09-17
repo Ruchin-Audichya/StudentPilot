@@ -11,7 +11,7 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DISABLE_LINKEDIN
-        value: "1"
+        value: "0"
       - key: SEARCH_TIME_BUDGET
         value: "7"
       - key: CORS_ORIGINS
