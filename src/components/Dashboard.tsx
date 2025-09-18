@@ -188,9 +188,24 @@ export default function Dashboard({ profile }: DashboardProps) {
   async function handleSearch() {
     setLoading(true);
     try {
-      const jobs = govOnly
+      let jobs = govOnly
         ? await fetchGovFeeds({ state: stateFilter || undefined, only_verified: true, limit: 80 })
         : await searchInternships({ skills, interests, location });
+      // Client-side de-duplication by cleaned URL and (title, company)
+      const seen = new Set<string>();
+      const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+      const cleanUrl = (u?: string) => (u || "").toLowerCase().split("?")[0];
+      const deduped: JobResult[] = [];
+      for (const j of jobs) {
+        const keyUrl = cleanUrl(j.url);
+        const keyTitle = norm(j.title || "");
+        const keyCompany = norm(j.company || "");
+        const k = keyUrl ? `u:${keyUrl}` : `tc:${keyTitle}|${keyCompany}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        deduped.push(j);
+      }
+      jobs = deduped;
       setResults(jobs);
       // Kick off analyzer in background if we have a resume in session
       setAnalyzing(true);

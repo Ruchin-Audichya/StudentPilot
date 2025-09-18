@@ -53,10 +53,10 @@ export default memo(function JobCard({ job }: Props) {
         </span>
       )}
 
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
-          <h3 className="text-base md:text-lg font-bold">{job.title}</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-base md:text-lg font-bold break-words line-clamp-2 leading-snug">{job.title}</h3>
+          <p className="text-sm text-muted-foreground break-words">
             {job.company ? `${job.company} • ` : ''}{job.location}
           </p>
         </div>
@@ -75,7 +75,7 @@ export default memo(function JobCard({ job }: Props) {
       )}
 
       {job.description && (
-        <p className="mt-2 text-sm text-muted-foreground line-clamp-3 min-h-[3.6em]">{job.description}</p>
+        <p className="mt-2 text-sm text-muted-foreground line-clamp-4 min-h-[4.8em] break-words">{job.description}</p>
       )}
 
       {/* Match score */}
@@ -138,13 +138,13 @@ export default memo(function JobCard({ job }: Props) {
         </div>
       )}
 
-      <div className="mt-auto pt-4 flex items-center justify-between">
-        <Button asChild className="gradient-primary text-white">
+      <div className="mt-auto pt-4 flex items-center justify-between gap-2 flex-wrap">
+        <Button asChild className="gradient-primary text-white w-full sm:w-auto">
           <a href={applyHref || "#"} target="_blank" rel="noopener noreferrer">Apply Now</a>
         </Button>
         <button
           onClick={() => applyHref && window.open(applyHref, "_blank")}
-          className="text-sm px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition"
+          className="text-sm px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition w-full sm:w-auto"
         >
           Details
         </button>
