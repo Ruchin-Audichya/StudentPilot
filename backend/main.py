@@ -256,7 +256,7 @@ def version_info():
         "status": "ok",
         "version": os.getenv("RELEASE", "dev"),
         "commit": os.getenv("GIT_SHA", "unknown"),
-        "backend": "studentpilot",
+    "backend": "findmystipend",
         "openrouter": bool(os.getenv("OPENROUTER_API_KEY", "").strip()),
     }
 

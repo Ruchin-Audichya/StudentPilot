@@ -4,7 +4,7 @@ Param(
   [switch]$KillRange
 )
 
-Write-Host "[DEV] Spinning up StudentPilot full stack (Backend=$BackendPort Frontend=$FrontendPort)" -ForegroundColor Cyan
+Write-Host "[DEV] Spinning up Find My Stipend full stack (Backend=$BackendPort Frontend=$FrontendPort)" -ForegroundColor Cyan
 
 # Start backend in background
 $backendParams = @{ Port = $BackendPort; Background = $true }

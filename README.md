@@ -2,9 +2,9 @@
 
 <div align="center">
 
-	<img src="./public/mascot.svg" alt="StudentPilot Mascot" width="120" height="120" />
+	<img src="./public/mascot.svg" alt="Find My Stipend Mascot" width="120" height="120" />
 
-	<h1>StudentPilot</h1>
+	<h1>Find My Stipend</h1>
 	<p>Find internships faster. Build your portfolio. Connect with real recruiters.</p>
 
 	<p>
@@ -18,7 +18,7 @@
 
 ---
 
-StudentPilot is a full-stack app that blends multiple job sources (Internshala, LinkedIn, company ATS careers) with resume-aware ranking, an AI-powered portfolio generator (Gemini), and HR tooling that surfaces real recruiter profiles to connect with—ready for Render + Vercel deployment.
+Find My Stipend is a full-stack app that blends multiple job sources (Internshala, LinkedIn, company ATS careers) with resume-aware ranking, an AI-powered portfolio generator (Gemini), and HR tooling that surfaces real recruiter profiles to connect with—ready for Render + Vercel deployment.
 
 ## Table of Contents
 - [Features](#features)

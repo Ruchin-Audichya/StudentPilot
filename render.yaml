@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: studentpilot
+  name: findmystipend
     env: docker
     plan: free
     autoDeploy: true
@@ -15,9 +15,9 @@ services:
       - key: SEARCH_TIME_BUDGET
         value: "7"
       - key: CORS_ORIGINS
-        value: "https://studentpilot.vercel.app,https://wms-virid-six.vercel.app,https://studentpilot.onrender.com,http://localhost:5173"
+  value: "https://findmystipend.vercel.app,https://wms-virid-six.vercel.app,https://findmystipend.onrender.com,http://localhost:5173"
       - key: FRONTEND_ORIGIN
-        value: "https://studentpilot.vercel.app"
+  value: "https://findmystipend.vercel.app"
       - key: OPENROUTER_MODELS
         value: "deepseek/deepseek-chat-v3-0324:free"
       - key: GOOGLE_API_KEY
