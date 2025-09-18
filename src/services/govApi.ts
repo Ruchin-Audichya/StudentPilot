@@ -21,7 +21,7 @@ export async function fetchGovFeeds(opts: { state?: string; only_verified?: bool
   let data: any;
   try {
     // Prefer live aggregated + cached endpoint
-    const livePath = `/api/gov/feeds/live${opts._force ? `?t=${Date.now()}` : ""}`;
+  const livePath = `/api/gov/feeds/live${opts._force ? `?force=true&t=${Date.now()}` : ""}`;
     data = await request(livePath);
   } catch {
     // Fallback to seeded endpoint
