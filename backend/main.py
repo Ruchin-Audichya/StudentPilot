@@ -147,7 +147,7 @@ def _openrouter_config():
     site_url = (
         os.getenv("OPENROUTER_SITE_URL", "").strip()
         or os.getenv("FRONTEND_ORIGIN", "").strip()
-        or "https://findmystipend.onrender.com"
+    or "https://studentpilot.onrender.com"
     )
     site_name = os.getenv("OPENROUTER_SITE_NAME", "Find My Stipend").strip() or "Find My Stipend"
     return key, models, base, site_url, site_name
