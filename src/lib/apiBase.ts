@@ -41,7 +41,7 @@ function computeApiBase(): string {
   if (isVercel || isHostedHttps) {
     // If no explicit base (or it's pointing to localhost), fall back to direct Render backend domain (bypasses rewrites)
     if (!cleaned || /^(https?:\/\/(localhost|127\.0\.0\.1)|localhost)/i.test(cleaned) || !isValidUrl(cleaned)) {
-      return 'https://studentpilot.onrender.com';
+  return 'https://findmystipend.onrender.com';
     }
     return cleaned.replace(/\/$/, '');
   }

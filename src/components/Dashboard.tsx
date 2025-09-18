@@ -784,7 +784,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                 <h3 className="text-base font-semibold">Instant Portfolio Website</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
-                Turn your resume into a simple portfolio. Download a ready-to-deploy ZIP (GitHub Pages or Vercel).
+                Turn your resume into an eye‑catching site with a starfield hero and gradient CTAs — branded for Find My Stipend. Download a ready-to-deploy ZIP (GitHub Pages or Vercel).
               </p>
               <div className="flex items-center gap-3">
                 <button

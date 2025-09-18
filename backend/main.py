@@ -147,9 +147,9 @@ def _openrouter_config():
     site_url = (
         os.getenv("OPENROUTER_SITE_URL", "").strip()
         or os.getenv("FRONTEND_ORIGIN", "").strip()
-        or "https://studentpilot.onrender.com"
+        or "https://findmystipend.onrender.com"
     )
-    site_name = os.getenv("OPENROUTER_SITE_NAME", "StudentPilot").strip() or "StudentPilot"
+    site_name = os.getenv("OPENROUTER_SITE_NAME", "Find My Stipend").strip() or "Find My Stipend"
     return key, models, base, site_url, site_name
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()  # (Future fallback)
 
@@ -163,7 +163,7 @@ app = FastAPI()
 # Root welcome route so EB doesn't show default placeholder page
 @app.get("/")
 def root():
-    return {"app": "StudentPilot API", "health": "/health", "endpoints": ["/api/search", "/api/upload-resume", "/api/chat"], "status": "ok"}
+    return {"app": "Find My Stipend API", "health": "/health", "endpoints": ["/api/search", "/api/upload-resume", "/api/chat"], "status": "ok"}
 # Mount modular routers
 try:
     from routes.company_scraper import router as company_scraper_router  # type: ignore
@@ -482,7 +482,7 @@ def _ai_enhanced_response(
     if site_name_override:
         site_name = site_name_override.strip() or site_name
     system_prompt = (
-        "You are StudentPilot—an internship and resume mentor. Be concrete, kind, and helpful.\n"
+        "You are Find My Stipend—an internship and resume mentor. Be concrete, kind, and helpful.\n"
         "STYLE:\n"
         "- Human-sounding, positive, and specific.\n"
         "- Use clean Markdown: bullets (- ), numbered lists, and **bold** sparingly.\n"
