@@ -1,5 +1,7 @@
+
 <div align="center">
 
+	<img src="./public/mascot-question.png" alt="Mascot Question" width="140" height="140" />
 	<img src="./public/wms-mascot.svg" alt="WMS Mascot" width="140" height="140" />
 
 	<h1>Find My Stipend</h1>
