@@ -1,0 +1,55 @@
+[
+  {
+    "source": "AICTE",
+    "org": "AICTE / Smart Education",
+    "department": "Government of India",
+    "title": "National Internship Drive (Software)",
+    "state": "All",
+    "location": "India (Remote)",
+    "stipend": "5000-10000 / month",
+    "apply_url": "https://internship.aicte-india.org/",
+    "description": "Internship opportunities aggregated by AICTE for software/IT students.",
+    "tags": ["aicte", "software", "national"],
+    "verified": true
+  },
+  {
+    "source": "NCS",
+    "org": "National Career Service",
+    "department": "Ministry of Labour & Employment",
+    "title": "Software Intern (Gov Projects)",
+    "state": "Rajasthan",
+    "location": "Jaipur, Rajasthan",
+    "stipend": "Stipend as per norms",
+    "apply_url": "https://www.ncs.gov.in/",
+    "description": "Internship postings curated via NCS; software and e-governance initiatives.",
+    "tags": ["ncs", "software", "government"],
+    "verified": true
+  },
+  {
+    "source": "MyGov",
+    "org": "MyGov",
+    "department": "MeitY",
+    "title": "MyGov Internship — Digital India",
+    "state": "All",
+    "location": "New Delhi / Remote",
+    "stipend": "Certificate + stipend (role-dependent)",
+    "apply_url": "https://innovateindia.mygov.in/internship/",
+    "description": "Work on national digital initiatives; content, tech, data.",
+    "tags": ["mygov", "digital", "content", "software"],
+    "verified": true
+  },
+  {
+    "source": "State",
+    "org": "Government of Rajasthan",
+    "department": "Smart Education",
+    "title": "Internship/Industrial Training with Placement Opportunity",
+    "state": "Rajasthan",
+    "location": "Rajasthan (Multiple Districts)",
+    "stipend": "0 / as per scheme",
+    "apply_url": "https://example.rajasthan.gov.in/internships/smart-education",
+    "description": "State-backed internship/training with placement focus for software roles.",
+    "tags": ["rajasthan", "software", "placement"],
+    "verified": true,
+    "is_new": true
+  }
+]

@@ -60,7 +60,12 @@ export default memo(function JobCard({ job }: Props) {
             {job.company ? `${job.company} • ` : ''}{job.location}
           </p>
         </div>
-        <span className="text-xs px-2 py-1 rounded-full bg-white/5 border border-card-border">{job.source || 'source'}</span>
+        <div className="flex items-center gap-2">
+          {(job as any).verified && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Verified</span>
+          )}
+          <span className="text-xs px-2 py-1 rounded-full bg-white/5 border border-card-border">{job.source || 'source'}</span>
+        </div>
       </div>
 
       {job.stipend && (

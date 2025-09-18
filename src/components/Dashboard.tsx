@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ChatWidget from "./ChatWidget";
 import { auth } from "@/lib/firebase";
 import { searchInternships, JobResult } from "@/services/jobApi";
+import { fetchGovFeeds } from "@/services/govApi";
 import { analyzeResumeAgainstJobs, toAnalyzeJobInputs, AnalyzerResponse } from "@/services/analyzer";
 import { fetchHRLinks } from "@/services/hrLinks";
 import { fetchHRProfiles, HRProfileLink } from "@/services/hrProfiles";
@@ -72,6 +73,8 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [sortBy, setSortBy] = useState<"scoreDesc" | "source" | "recent">("scoreDesc");
   const [autoSearch, setAutoSearch] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<"all" | "ats" | "linkedin" | "internshala">("all");
+  const [govOnly, setGovOnly] = useState(false);
+  const [stateFilter, setStateFilter] = useState<string>("Rajasthan");
 
   // Suggestions from parsed resume (if uploaded)
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
@@ -185,7 +188,9 @@ export default function Dashboard({ profile }: DashboardProps) {
   async function handleSearch() {
     setLoading(true);
     try {
-      const jobs = await searchInternships({ skills, interests, location });
+      const jobs = govOnly
+        ? await fetchGovFeeds({ state: stateFilter || undefined, only_verified: true, limit: 80 })
+        : await searchInternships({ skills, interests, location });
       setResults(jobs);
       // Kick off analyzer in background if we have a resume in session
       setAnalyzing(true);
@@ -475,6 +480,10 @@ export default function Dashboard({ profile }: DashboardProps) {
             setInterests={setInterests}
             location={location}
             setLocation={setLocation}
+            govOnly={govOnly}
+            setGovOnly={setGovOnly}
+            stateFilter={stateFilter}
+            setStateFilter={setStateFilter}
             suggestedSkills={suggestedSkills}
             onUseFromResume={useTopFromResume}
             onClear={clearAll}

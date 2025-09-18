@@ -13,6 +13,10 @@ type Props = {
   setInterests: (v: string[]) => void;
   location: string;
   setLocation: (s: string) => void;
+  govOnly: boolean;
+  setGovOnly: (b: boolean) => void;
+  stateFilter: string;
+  setStateFilter: (s: string) => void;
   suggestedSkills?: string[];
   onUseFromResume?: () => void;
   onClear?: () => void;
@@ -42,6 +46,8 @@ const FilterBox: React.FC<Props> = ({
   autoSearch, setAutoSearch,
   onSearch,
   loading = false,
+  govOnly, setGovOnly,
+  stateFilter, setStateFilter,
 }) => {
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   const [showMoreSkills, setShowMoreSkills] = React.useState(false);
@@ -104,6 +110,15 @@ const FilterBox: React.FC<Props> = ({
               </button>
               <button
                 type="button"
+                aria-pressed={govOnly}
+                onClick={() => setGovOnly(!govOnly)}
+                className={`wm-pill px-3 py-1.5 ${govOnly ? 'bg-white/20 border-white/30' : ''}`}
+                title="Government/PSU feeds only"
+              >
+                Gov only
+              </button>
+              <button
+                type="button"
                 aria-pressed={onlyNew}
                 onClick={() => setOnlyNew(!onlyNew)}
                 className={`wm-pill px-3 py-1.5 ${onlyNew ? 'bg-white/20 border-white/30' : ''}`}
@@ -154,6 +169,16 @@ const FilterBox: React.FC<Props> = ({
                         <option value="source">Source</option>
                         <option value="recent">Recent</option>
                       </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>State</span>
+                      <input
+                        type="text"
+                        value={stateFilter}
+                        onChange={(e)=>setStateFilter(e.target.value)}
+                        placeholder="e.g. Rajasthan"
+                        className="bg-input/50 border border-card-border rounded-full px-3 py-1 w-[160px]"
+                      />
                     </div>
                   </div>
                 </motion.div>
