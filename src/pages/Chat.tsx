@@ -9,7 +9,7 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <TopNav actions={[]} />
       <main className="flex-1 px-3 sm:px-6 py-3 sm:py-6">
         <div className="max-w-4xl mx-auto">

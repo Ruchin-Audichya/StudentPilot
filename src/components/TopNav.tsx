@@ -11,7 +11,7 @@ export default function TopNav({ actions = [] as Action[] }) {
     { label: "🛰️ Opportunity Radar", to: "/oppradar" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
-    <nav className="sticky top-0 z-30 bg-black/60 backdrop-blur border-b border-white/10">
+    <nav className="sticky top-0 z-30 w-screen left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur border-b border-white/10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
         <h1 className="text-base sm:text-lg font-bold tracking-tight">
           Find My Stipend<span className="align-super">®</span>

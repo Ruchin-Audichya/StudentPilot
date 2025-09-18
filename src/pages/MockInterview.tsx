@@ -799,7 +799,7 @@ const MockInterview = () => {
     }, [micMonitorOn, micGain]);
 
     return (
-        <div className="min-h-screen p-6 md:p-8">
+        <div className="min-h-screen p-6 md:p-8 overflow-x-hidden">
             <TopNav
                 actions={[
                     { label: "🏠 Home", to: "/" },
