@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import time
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -52,6 +53,29 @@ _CACHE: Dict[str, Any] = {"ts": 0.0, "items": []}
 _TTL_SECONDS = 60 * 60 * 24  # 24 hours
 
 
+def _is_verified_by_domain(url: Optional[str]) -> bool:
+    if not url:
+        return False
+    try:
+        host = urlparse(url).hostname or ""
+        host = host.lower()
+        # Strict government-owned domains
+        if host.endswith(".gov.in") or host.endswith(".nic.in"):
+            return True
+        # Whitelist a few well-known official portals used in India
+        whitelist = {
+            "aicte-india.org",  # AICTE
+            "niti.gov.in",      # NITI Aayog (covered by .gov.in anyway)
+            "mygov.in",         # MyGov
+            "bis.gov.in",       # BIS
+            "drdo.gov.in",      # DRDO
+            "mahaswayam.gov.in",# Maharashtra portal
+        }
+        return any(host == d or host.endswith("." + d) for d in whitelist)
+    except Exception:
+        return False
+
+
 def _normalize(
     *,
     title: str,
@@ -62,7 +86,7 @@ def _normalize(
     apply_url: Optional[str],
     description: str,
     tags: Optional[List[str]] = None,
-    verified: bool = True,
+    verified: Optional[bool] = None,
 ) -> Dict[str, Any]:
     item = {
         "source": "gov",
@@ -73,8 +97,12 @@ def _normalize(
         "apply_url": apply_url,
         "description": description or "",
         "tags": list({"government", *(tags or [])}),
-        "verified": bool(verified),
     }
+    # Auto-verify by domain when not explicitly provided
+    if verified is None:
+        item["verified"] = _is_verified_by_domain(apply_url)
+    else:
+        item["verified"] = bool(verified)
     item["score"] = _simple_score(item)
     return item
 
@@ -155,6 +183,66 @@ def _fetch_mygov() -> List[Dict[str, Any]]:
     ]
 
 
+def _fetch_drdo() -> List[Dict[str, Any]]:
+    url = "https://www.drdo.gov.in/internship"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "DRDO Internship Program — research and engineering opportunities across labs."
+    return [
+        _normalize(
+            title="DRDO Internship Program",
+            company="DRDO",
+            location="Across India",
+            state="All",
+            stipend="Role-dependent",
+            apply_url=url,
+            description=desc or title,
+            tags=["drdo", "defence", "research"],
+            verified=None,  # infer from domain
+        )
+    ]
+
+
+def _fetch_niti() -> List[Dict[str, Any]]:
+    url = "https://www.niti.gov.in/internship"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "NITI Aayog Internship — policy and research-focused internships."
+    return [
+        _normalize(
+            title="NITI Aayog Internship",
+            company="NITI Aayog",
+            location="New Delhi / Remote",
+            state="All",
+            stipend="Unpaid / As per policy",
+            apply_url=url,
+            description=desc or title,
+            tags=["niti", "policy", "research"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_mahaswayam() -> List[Dict[str, Any]]:
+    url = "https://mahaswayam.gov.in/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "MahaSwayam — Maharashtra Government's unified portal for jobs and internships."
+    return [
+        _normalize(
+            title="MahaSwayam (Maharashtra)",
+            company="Govt. of Maharashtra",
+            location="Maharashtra, India",
+            state="Maharashtra",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["maharashtra", "state", "portal"],
+            verified=None,
+        )
+    ]
+
+
 def _dedup(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     seen: set = set()
     out: List[Dict[str, Any]] = []
@@ -180,6 +268,18 @@ def _aggregate_live() -> List[Dict[str, Any]]:
         pass
     try:
         items.extend(_fetch_mygov())
+    except Exception:
+        pass
+    try:
+        items.extend(_fetch_drdo())
+    except Exception:
+        pass
+    try:
+        items.extend(_fetch_niti())
+    except Exception:
+        pass
+    try:
+        items.extend(_fetch_mahaswayam())
     except Exception:
         pass
 
