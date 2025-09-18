@@ -11,7 +11,7 @@ type Row = {
 
 export default function GovSnapshot() {
   const qp = new URLSearchParams(location.search);
-  const [stateFilter, setStateFilter] = useState<string>(qp.get("state") || "Rajasthan");
+  const [stateFilter, setStateFilter] = useState<string>((qp.get("state") || "") === "All" ? "" : (qp.get("state") || ""));
   const [onlyVerified, setOnlyVerified] = useState<boolean>((qp.get("verified") || "true") === "true");
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
