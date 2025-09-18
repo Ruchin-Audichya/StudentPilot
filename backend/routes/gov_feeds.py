@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import os
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+import time
+import requests
+from bs4 import BeautifulSoup
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -44,34 +47,229 @@ def _simple_score(item: Dict[str, Any]) -> float:
     return float(min(100.0, max(0.0, score)))
 
 
+# --- Live fetch + cache (simple) ---
+_CACHE: Dict[str, Any] = {"ts": 0.0, "items": []}
+_TTL_SECONDS = 60 * 60 * 24  # 24 hours
+
+
+def _normalize(
+    *,
+    title: str,
+    company: str,
+    location: str,
+    state: Optional[str],
+    stipend: Optional[str],
+    apply_url: Optional[str],
+    description: str,
+    tags: Optional[List[str]] = None,
+    verified: bool = True,
+) -> Dict[str, Any]:
+    item = {
+        "source": "gov",
+        "title": title or "Internship",
+        "company": company or "Government",
+        "location": location or (state or "India"),
+        "stipend": stipend or None,
+        "apply_url": apply_url,
+        "description": description or "",
+        "tags": list({"government", *(tags or [])}),
+        "verified": bool(verified),
+    }
+    item["score"] = _simple_score(item)
+    return item
+
+
+def _page_meta(url: str, timeout: float = 10.0) -> Tuple[str, str]:
+    """Fetch page title + meta description. Best-effort; returns (title, desc)."""
+    try:
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0 (compatible; StudentPilot/1.0)"})
+        if r.status_code != 200:
+            return "", ""
+        soup = BeautifulSoup(r.text, "html.parser")
+        title = (soup.title.string if soup.title and soup.title.string else "").strip()
+        desc_tag = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+        desc = (desc_tag.get("content") if desc_tag else "") or ""
+        return title[:200], desc[:500]
+    except Exception:
+        return "", ""
+
+
+def _fetch_aicte() -> List[Dict[str, Any]]:
+    url = "https://internship.aicte-india.org/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        # Fallback minimal item
+        desc = "AICTE Internship portal with government-backed internships."
+    return [
+        _normalize(
+            title="AICTE Internship Portal",
+            company="AICTE",
+            location="India / Remote",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["aicte", "national"],
+            verified=True,
+        )
+    ]
+
+
+def _fetch_ncs() -> List[Dict[str, Any]]:
+    url = "https://www.ncs.gov.in/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "National Career Service portal; search for internships in government programs."
+    return [
+        _normalize(
+            title="NCS Internship Listings",
+            company="National Career Service",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["ncs", "government"],
+            verified=True,
+        )
+    ]
+
+
+def _fetch_mygov() -> List[Dict[str, Any]]:
+    url = "https://innovateindia.mygov.in/internship/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "MyGov Internship — opportunities on Digital India initiatives."
+    return [
+        _normalize(
+            title="MyGov Internship",
+            company="MyGov / MeitY",
+            location="New Delhi / Remote",
+            state="All",
+            stipend="Role-dependent",
+            apply_url=url,
+            description=desc or title,
+            tags=["mygov", "digital"],
+            verified=True,
+        )
+    ]
+
+
+def _dedup(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: set = set()
+    out: List[Dict[str, Any]] = []
+    for it in items:
+        key = (it.get("title", "").strip().lower(), (it.get("company") or "").strip().lower(), (it.get("apply_url") or "").strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
+
+
+def _aggregate_live() -> List[Dict[str, Any]]:
+    # Combine live fetchers with seed file
+    items: List[Dict[str, Any]] = []
+    try:
+        items.extend(_fetch_aicte())
+    except Exception:
+        pass
+    try:
+        items.extend(_fetch_ncs())
+    except Exception:
+        pass
+    try:
+        items.extend(_fetch_mygov())
+    except Exception:
+        pass
+
+    # Bring in seeded examples as well (acts as fallback + examples)
+    try:
+        for it in _load_feed():
+            items.append(
+                _normalize(
+                    title=it.get("title") or "Internship",
+                    company=it.get("org") or it.get("department") or "Government",
+                    location=it.get("location") or (it.get("state") or "India"),
+                    state=it.get("state"),
+                    stipend=it.get("stipend"),
+                    apply_url=it.get("apply_url") or it.get("url"),
+                    description=it.get("description") or "",
+                    tags=(it.get("tags") or []),
+                    verified=bool(it.get("verified", True)),
+                )
+            )
+    except Exception:
+        pass
+
+    items = _dedup(items)
+    # Score already computed in _normalize; sort here
+    items.sort(key=lambda x: (x.get("score") or 0), reverse=True)
+    return items
+
+
+def _get_cached_items(force: bool = False) -> List[Dict[str, Any]]:
+    now = time.time()
+    if not force and _CACHE.get("items") and now - float(_CACHE.get("ts", 0.0)) < _TTL_SECONDS:
+        return list(_CACHE["items"])  # shallow copy
+    items = _aggregate_live()
+    _CACHE["items"] = items
+    _CACHE["ts"] = now
+    return list(items)
+
+
 @router.post("/feeds")
 def get_gov_feeds(f: GovFilter) -> Dict[str, Any]:
-    items = _load_feed()
-    if not items:
-        return {"results": [], "count": 0}
+    # Default endpoint keeps previous seed behavior but uses normalized path for consistency
+    base_items: List[Dict[str, Any]] = []
+    for it in _load_feed():
+        norm = _normalize(
+            title=it.get("title") or "Internship",
+            company=it.get("org") or it.get("department") or "Government",
+            location=it.get("location") or (it.get("state") or "India"),
+            state=it.get("state"),
+            stipend=it.get("stipend"),
+            apply_url=it.get("apply_url") or it.get("url"),
+            description=it.get("description") or "",
+            tags=(it.get("tags") or []),
+            verified=bool(it.get("verified", True)),
+        )
+        # keep is_new if present
+        norm["is_new"] = it.get("is_new", False)
+        base_items.append(norm)
 
+    # Filtering
+    out: List[Dict[str, Any]] = []
+    for it in base_items:
+        if f.only_verified and not it.get("verified"):
+            continue
+        if f.state and f.state.strip() and f.state.lower() not in (it.get("location", "").lower() + " " + (it.get("description", "").lower())):
+            continue
+        out.append(it)
+
+    # Sort + limit
+    out.sort(key=lambda x: (x.get("score") or 0), reverse=True)
+    out = out[: f.limit]
+    return {"results": out, "count": len(out)}
+
+
+@router.post("/feeds/live")
+def get_gov_feeds_live(f: GovFilter, force: bool = False) -> Dict[str, Any]:
+    """Live aggregation with caching. Falls back internally to seeds if sources fail."""
+    items = _get_cached_items(force=force)
+
+    # Filter
     out: List[Dict[str, Any]] = []
     for it in items:
         if f.only_verified and not it.get("verified"):
             continue
-        if f.state and (it.get("state") or "").lower() != f.state.lower():
-            continue
-        norm = {
-            "source": "gov",
-            "title": it.get("title") or "Internship",
-            "company": it.get("org") or it.get("department") or "Government",
-            "location": it.get("location") or (f.state or "India"),
-            "stipend": it.get("stipend") or None,
-            "apply_url": it.get("apply_url") or it.get("url") or None,
-            "description": it.get("description") or "",
-            "tags": list({"government", *(it.get("tags") or [])}),
-            "score": _simple_score(it),
-            "is_new": it.get("is_new", False),
-            "verified": bool(it.get("verified", False)),
-        }
-        out.append(norm)
+        if f.state and f.state.strip():
+            s = f.state.lower()
+            blob = (it.get("location") or "").lower() + " " + (it.get("description") or "").lower() + " " + (it.get("title") or "").lower()
+            if s not in blob:
+                continue
+        out.append(it)
 
-    # Sort by score desc; then limit
     out.sort(key=lambda x: (x.get("score") or 0), reverse=True)
     out = out[: f.limit]
-    return {"results": out, "count": len(out)}
+    return {"results": out, "count": len(out), "cached_at": _CACHE.get("ts", 0.0)}

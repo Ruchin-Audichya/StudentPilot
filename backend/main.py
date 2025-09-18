@@ -197,6 +197,11 @@ try:
 except Exception:
     pass
 try:
+    from routes.gov_feeds import router as gov_feeds_router  # type: ignore
+    app.include_router(gov_feeds_router)
+except Exception:
+    pass
+try:
     from routes.testimonials import router as testimonials_router  # type: ignore
     app.include_router(testimonials_router)
 except Exception:

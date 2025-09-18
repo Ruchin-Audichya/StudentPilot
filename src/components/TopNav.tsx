@@ -8,6 +8,7 @@ export default function TopNav({ actions = [] as Action[] }) {
   // Always add OppRadar to actions if not present
   const mergedActions = [
     ...actions,
+    { label: "🏛️ Gov Snapshot", to: "/gov-snapshot" },
     { label: "🛰️ Opportunity Radar", to: "/oppradar" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (

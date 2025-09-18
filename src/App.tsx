@@ -6,6 +6,7 @@ import MockInterview from '@/pages/MockInterview';
 import ResumeGenius from '@/pages/ResumeGenius';
 import Chat from '@/pages/Chat';
 import OppRadar from '@/pages/OppRadar';
+import GovSnapshot from '@/pages/GovSnapshot';
 import Onboarding from "@/components/Onboarding";
 import Dashboard from "@/components/Dashboard";
 import Logout from "./pages/Logout";
@@ -43,6 +44,9 @@ export default function App() {
           <Chat />
           {isMobile && <MobileTabBar />}
         </>} />
+
+        {/* Government Snapshot */}
+        <Route path="/gov-snapshot" element={<GovSnapshot />} />
 
         {/* Auth page */}
         <Route path="/auth" element={<AuthPage />} />
