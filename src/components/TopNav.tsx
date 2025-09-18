@@ -12,16 +12,13 @@ export default function TopNav({ actions = [] as Action[] }) {
     { label: "🏛️ Gov Snapshot", to: "/gov-snapshot" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
-  <nav className="sticky top-0 z-30 w-screen left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur border-b border-white/10 text-white">
+    <nav className="sticky top-0 z-30 w-screen left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur border-b border-white/10 text-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <img src="/mascot.svg" alt="Find My Stipend" className="h-7 w-7 rounded-md" />
-          <h1 className="text-base sm:text-lg font-bold tracking-tight">
-            Find My Stipend<span className="align-super">®</span>
-          </h1>
-        </div>
-        {/* Desktop actions */}
-        <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
+        <h1 className="text-base sm:text-lg font-bold tracking-tight">
+          Find My Stipend<span className="align-super">®</span>
+        </h1>
+        {/* Desktop actions (Landing-style: lightweight text links) */}
+        <div className="hidden sm:flex flex-wrap items-center gap-3 sm:gap-5">
           {mergedActions.map((a) => (
             a.newTab ? (
               <a
@@ -29,12 +26,12 @@ export default function TopNav({ actions = [] as Action[] }) {
                 href={a.to}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-200"
+                className="hover:text-gray-300 text-sm"
               >
                 {a.label}
               </a>
             ) : (
-              <Link key={a.to} to={a.to} className="px-4 py-2 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-200">
+              <Link key={a.to} to={a.to} className="hover:text-gray-300 text-sm">
                 {a.label}
               </Link>
             )
@@ -42,7 +39,7 @@ export default function TopNav({ actions = [] as Action[] }) {
         </div>
         {/* Mobile menu */}
         <div className="sm:hidden ml-auto">
-          <button onClick={() => setOpen(v => !v)} className="px-3 py-1.5 rounded-full bg-white text-black text-sm font-semibold">Menu</button>
+          <button onClick={() => setOpen(v => !v)} className="px-3 py-1.5 rounded-md bg-white/10 border border-white/20 text-sm font-semibold hover:bg-white/15">Menu</button>
         </div>
       </div>
       {open && (
