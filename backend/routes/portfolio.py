@@ -39,138 +39,169 @@ def _html_escape(x: Optional[str]) -> str:
 
 
 def _build_site(resume: Dict[str, Any], include_vercel: bool = True, enriched: Optional[Dict[str, Any]] = None) -> bytes:
-    name = _html_escape(resume.get("name") or "Your Name")
-    # Prefer AI-enriched about/summary when provided
-    enriched_about = (enriched or {}).get("about") if isinstance(enriched, dict) else None
-    summary = _html_escape(enriched_about or resume.get("summary") or "")
-    email = _html_escape(resume.get("email") or "")
-    phone = _html_escape(resume.get("phone") or "")
-    location = _html_escape(resume.get("location") or "")
-    skills = (enriched.get("skills") if isinstance(enriched, dict) and enriched.get("skills") else resume.get("skills")) or []
-    links = resume.get("links") or []
-    projects = (enriched.get("projects") if isinstance(enriched, dict) and enriched.get("projects") else resume.get("projects")) or []
-    experience = (enriched.get("experience") if isinstance(enriched, dict) and enriched.get("experience") else resume.get("experience")) or []
-    education = resume.get("education") or []
+    # Basic fields with optional AI-enriched overrides
+    name = _html_escape(resume.get('name') or 'Your Name')
+    enriched_about = (enriched or {}).get('about') if isinstance(enriched, dict) else None
+    summary = _html_escape(enriched_about or resume.get('summary') or '')
+    email = _html_escape(resume.get('email') or '')
+    phone = _html_escape(resume.get('phone') or '')
+    location = _html_escape(resume.get('location') or '')
+    skills = (enriched.get('skills') if isinstance(enriched, dict) and enriched.get('skills') else resume.get('skills')) or []
+    links = resume.get('links') or []
+    projects = (enriched.get('projects') if isinstance(enriched, dict) and enriched.get('projects') else resume.get('projects')) or []
+    experience = (enriched.get('experience') if isinstance(enriched, dict) and enriched.get('experience') else resume.get('experience')) or []
+    education = resume.get('education') or []
 
-    # Compute link anchors
     def _link_tags(ls: List[Dict[str, str]]) -> str:
         if not ls:
-            return ""
+            return ''
         return '<div class="links">' + ''.join([f'<a href="{_html_escape(l.get("url"))}" target="_blank">{_html_escape(l.get("label") or l.get("url"))}</a>' for l in ls]) + '</div>'
 
-    # Project/experience rendering accommodating enriched fields
     def _render_projects(ps: List[Dict[str, Any]]) -> str:
         if not ps:
-            return ""
-        parts = []
+            return ''
+        parts: List[str] = []
         for p in ps:
-            title = _html_escape(p.get("title") or p.get("name") or "Project")
-            tagline = _html_escape(p.get("tagline") or "")
-            desc = _html_escape(p.get("description") or "")
-            link = _html_escape(p.get("link") or p.get("url") or "")
-            tech = p.get("tech") or p.get("technologies") or []
+            title = _html_escape(p.get('title') or p.get('name') or 'Project')
+            tagline = _html_escape(p.get('tagline') or '')
+            desc = _html_escape(p.get('description') or '')
+            link = _html_escape(p.get('link') or p.get('url') or '')
+            tech = p.get('tech') or p.get('technologies') or []
             tech_html = ''
             if tech:
                 chips = ''.join([f'<li>{_html_escape(str(t))}</li>' for t in tech[:10]])
                 tech_html = f'<ul class="tags">{chips}</ul>'
             link_html = f'<p class="muted"><a href="{link}" target="_blank">View project</a></p>' if link else ''
-            parts.append(f'<article class="card"><h3>{title}</h3>' + (f'<p class="muted">{tagline}</p>' if tagline else '') + (f'<p>{desc}</p>' if desc else '') + tech_html + link_html + '</article>')
+            parts.append(
+                f'<article class="card"><h3>{title}</h3>'
+                + (f'<p class="muted">{tagline}</p>' if tagline else '')
+                + (f'<p>{desc}</p>' if desc else '')
+                + tech_html + link_html + '</article>'
+            )
         return '<section id="projects"><h2>Projects</h2>' + ''.join(parts) + '</section>'
 
     def _render_experience(xs: List[Dict[str, Any]]) -> str:
         if not xs:
-            return ""
-        parts = []
+            return ''
+        parts: List[str] = []
         for x in xs:
-            role = _html_escape(x.get("role") or x.get("title") or "Intern")
-            company = _html_escape(x.get("company") or "")
-            period = _html_escape(x.get("period") or x.get("dates") or "")
-            desc = _html_escape(x.get("description") or "")
-            highlights = x.get("highlights") or []
+            role = _html_escape(x.get('role') or x.get('title') or 'Intern')
+            company = _html_escape(x.get('company') or '')
+            period = _html_escape(x.get('period') or x.get('dates') or '')
+            desc = _html_escape(x.get('description') or '')
+            highlights = x.get('highlights') or []
             body = ''
             if highlights:
                 lis = ''.join([f'<li>{_html_escape(str(h))}</li>' for h in highlights[:6]])
                 body = f'<ul class="bullets">{lis}</ul>'
             elif desc:
                 body = f'<p>{desc}</p>'
-            parts.append(f'<article class="card"><h3>{role} – {company}</h3>' + (f'<div class="period">{period}</div>' if period else '') + body + '</article>')
+            parts.append(
+                f'<article class="card"><h3>{role} - {company}</h3>'
+                + (f'<div class="period">{period}</div>' if period else '')
+                + body + '</article>'
+            )
         return '<section id="experience"><h2>Experience</h2>' + ''.join(parts) + '</section>'
 
     def _render_education(es: List[Dict[str, Any]]) -> str:
         if not es:
-            return ""
-        parts = []
+            return ''
+        parts: List[str] = []
         for e in es:
-            degree = _html_escape(e.get("degree") or e.get("title") or "B.Tech")
-            school = _html_escape(e.get("school") or e.get("institution") or "")
-            period = _html_escape(e.get("period") or e.get("dates") or "")
-            parts.append(f'<article class="card"><h3>{degree} – {school}</h3>' + (f'<div class="period">{period}</div>' if period else '') + '</article>')
+            degree = _html_escape(e.get('degree') or e.get('title') or 'B.Tech')
+            school = _html_escape(e.get('school') or e.get('institution') or '')
+            period = _html_escape(e.get('period') or e.get('dates') or '')
+            parts.append(
+                f'<article class="card"><h3>{degree} - {school}</h3>'
+                + (f'<div class="period">{period}</div>' if period else '')
+                + '</article>'
+            )
         return '<section id="education"><h2>Education</h2>' + ''.join(parts) + '</section>'
 
-    # Determine resume download link from links (common labels) and LinkedIn profile link
-    resume_link = ""
-    linkedin_link = "https://www.linkedin.com"
+    # Resume link detection
+    resume_link = ''
     for l in links:
-        label = (l.get("label") or "").lower()
-        url = _html_escape(l.get("url") or "")
-        if not resume_link and ("resume" in label or "cv" in label):
+        label = (l.get('label') or '').lower()
+        url = _html_escape(l.get('url') or '')
+        if not resume_link and ('resume' in label or 'cv' in label):
             resume_link = url
-        if "linkedin" in label and url:
-            linkedin_link = url
 
-    index_html = f"""<!doctype html>
-<html lang=\"en\">
-<head>
-  <meta charset=\"utf-8\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>{name} – Portfolio</title>
-  <link rel=\"stylesheet\" href=\"styles.css\">
-</head>
-<body>
-  <main class=\"container\">
-    <header class=\"hero\">
-      <div class=\"hero-bg\"></div>
-      <div class=\"hero-inner\">
-        <h1>{name}</h1>
-        <div class=\"meta\">{location}{' • ' if location and (email or phone) else ''}{email}{' • ' if email and phone else ''}{phone}</div>
-                {f'<p class=\"summary\">{summary}</p>' if summary else ''}
-                <div class=\"cta\"> 
-                    {f'<a class=\"btn primary\" href=\"{_html_escape(linkedin_link)}\" target=\"_blank\">Connect on LinkedIn</a>'}
-                    {f'<a class=\"btn\" href=\"mailto:{email}\">Email Me</a>' if email else ''}
-                    {f'<a class=\"btn\" href=\"{resume_link}\" target=\"_blank\">Download Resume</a>' if resume_link else ''}
-                </div>
-                {_link_tags(links)}
-      </div>
-    </header>
+    resume_dl = _html_escape(resume_link or 'resume.txt')
+    meta_parts: List[str] = []
+    if location:
+        meta_parts.append(location)
+    if email:
+        meta_parts.append(email)
+    if phone:
+        meta_parts.append(phone)
+    meta_text = ' • '.join([m for m in meta_parts if m])
+    summary_html = f'<p class="summary">{summary}</p>' if summary else ''
+    mailto_html = f'<a class="btn" href="mailto:{email}">Contact Me</a>' if email else ''
+    links_html = _link_tags(links)
 
-    {('<section id=\"skills\"><h2>Skills</h2><ul class=\"tags\">' + ''.join([f'<li>{_html_escape(s)}</li>' for s in skills]) + '</ul></section>') if skills else ''}
+    if skills:
+        skills_items = ''.join([f'<li>{_html_escape(s)}</li>' for s in skills])
+        skills_html = f'<section id="skills"><h2>Skills</h2><ul class="tags">{skills_items}</ul></section>'
+    else:
+        skills_html = ''
 
-    {_render_projects(projects)}
+    projects_html = _render_projects(projects)
+    experience_html = _render_experience(experience)
+    education_html = _render_education(education)
 
-    {_render_experience(experience)}
-
-    {_render_education(education)}
-
-    <footer>Built with ❤️ by StudentPilot</footer>
-  </main>
-</body>
-</html>"""
+    index_html = (
+        f"<!doctype html>\n" 
+        f"<html lang=\"en\">\n<head>\n"
+        f"    <meta charset=\"utf-8\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+        f"    <title>{name} - Portfolio</title>\n"
+        f"    <link rel=\"stylesheet\" href=\"styles.css\">\n"
+        f"</head>\n<body>\n"
+        f"    <canvas id=\"bg\"></canvas>\n"
+        f"    <main class=\"container\">\n"
+        f"        <header class=\"hero\" role=\"banner\" aria-label=\"Intro\">\n"
+        f"            <div class=\"hero-bg\"></div>\n"
+        f"            <div class=\"hero-inner\">\n"
+        f"                <h1>Hi, I'm {name}</h1>\n"
+        f"                <div class=\"meta\">{meta_text}</div>\n"
+        f"                {summary_html}\n"
+        f"                <div class=\"cta\">\n"
+        f"                    <a class=\"btn primary gradient\" href=\"#projects\">See My Work 🚀</a>\n"
+        f"                    {mailto_html}\n"
+        f"                    <a class=\"btn\" href=\"{resume_dl}\" target=\"_blank\">Download Resume</a>\n"
+        f"                </div>\n"
+        f"                {links_html}\n"
+        f"            </div>\n"
+        f"        </header>\n\n"
+        f"        {skills_html}\n\n"
+        f"        {projects_html}\n\n"
+        f"        {experience_html}\n\n"
+        f"        {education_html}\n\n"
+        f"        <footer>\n            <div class=\"brand\">Find <span>My</span> Stipend</div>\n        </footer>\n"
+        f"    </main>\n"
+        f"    <script src=\"main.js\"></script>\n"
+        f"</body>\n</html>"
+    )
 
     styles_css = """
 *{box-sizing:border-box}
-body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#14233b,#0b0f17 40%);color:#e6edf3}
-.container{max-width:980px;margin:0 auto;padding:32px}
-.hero{position:relative;border:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,rgba(131,201,255,.06),rgba(255,255,255,.02));padding:26px;border-radius:16px;overflow:hidden;margin-bottom:24px}
-.hero-bg{position:absolute;inset:-20px;background:radial-gradient(600px 200px at 0% 0%,rgba(131,201,255,.08),transparent),radial-gradient(400px 200px at 100% -10%,rgba(255,163,163,.10),transparent);filter:blur(6px);animation:pulse 6s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:.9;transform:scale(1.02)}}
-.hero-inner{position:relative}
-h1{margin:0 0 6px 0;font-size:32px}
-.meta{opacity:.8;font-size:14px;margin-bottom:8px}
-.summary{opacity:.95;max-width:70ch}
-.cta{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#e6edf3;text-decoration:none;transition:.2s ease}
+html,body{height:100%}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;background:#0b0f17;color:#e6edf3;overflow-x:hidden}
+#bg{position:fixed;inset:0;z-index:0}
+.container{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:32px}
+.hero{position:relative;border:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,rgba(131,201,255,.06),rgba(255,255,255,.02));padding:28px;border-radius:20px;overflow:hidden;margin:60px auto 24px auto;box-shadow:0 20px 80px rgba(0,0,0,.4)}
+.hero-bg{position:absolute;inset:-20px;background:radial-gradient(800px 240px at 0% 0%,rgba(131,201,255,.10),transparent),radial-gradient(600px 240px at 100% -10%,rgba(255,163,163,.12),transparent);filter:blur(10px);animation:pulse 6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:.95;transform:scale(1.02)}}
+.hero-inner{position:relative;text-align:center}
+h1{margin:0 0 10px 0;font-size:42px;letter-spacing:.3px}
+.meta{opacity:.8;font-size:14px;margin-bottom:10px}
+.summary{opacity:.95;max-width:70ch;margin:0 auto}
+.cta{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:16px 0}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#e6edf3;text-decoration:none;transition:.25s ease;backdrop-filter:blur(6px)}
 .btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.08)}
 .btn.primary{border-color:rgba(131,201,255,.35);background:rgba(131,201,255,.10);color:#bfe6ff}
-.links{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.btn.gradient{background:linear-gradient(90deg,#00d4ff,#d400ff);border:0;color:white}
+.btn.gradient:hover{filter:brightness(1.1)}
+.links{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
 .links a{color:#83c9ff;text-decoration:none;border:1px solid rgba(131,201,255,.25);padding:6px 10px;border-radius:999px;background:rgba(131,201,255,.05)}
 .links a:hover{background:rgba(131,201,255,.10)}
 h2{font-size:20px;margin:26px 0 12px 0}
@@ -184,7 +215,43 @@ section{margin-bottom:16px}
 .period{opacity:.7;font-size:12px;margin-bottom:4px}
 .bullets{margin:8px 0 0 18px}
 .bullets li{margin:4px 0}
-footer{opacity:.6;font-size:12px;margin-top:26px}
+footer{opacity:.8;font-size:12px;margin-top:26px;text-align:center}
+.brand{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:linear-gradient(90deg,rgba(0,212,255,.12),rgba(212,0,255,.12));}
+.brand span{color:#83c9ff}
+"""
+
+    main_js = """
+(function(){
+    const canvas = document.getElementById('bg');
+    if(!canvas) return; const ctx = canvas.getContext('2d');
+    let w=canvas.width=window.innerWidth, h=canvas.height=window.innerHeight;
+    const DPR = Math.min(2, window.devicePixelRatio||1); canvas.width=w*DPR; canvas.height=h*DPR; canvas.style.width=w+'px'; canvas.style.height=h+'px'; ctx.scale(DPR,DPR);
+    const N = Math.min(120, Math.floor(w*h/18000));
+    const pts = Array.from({length:N}, ()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5}));
+    function resize(){ w=window.innerWidth; h=window.innerHeight; canvas.width=w*DPR; canvas.height=h*DPR; canvas.style.width=w+'px'; canvas.style.height=h+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); }
+    window.addEventListener('resize', resize);
+    function step(){
+        ctx.clearRect(0,0,w,h);
+        ctx.fillStyle='rgba(255,255,255,0.8)';
+        for(const p of pts){ p.x+=p.vx; p.y+=p.vy; if(p.x<0||p.x>w) p.vx*=-1; if(p.y<0||p.y>h) p.vy*=-1; ctx.fillRect(p.x, p.y, 1.2, 1.2);}    
+        for(let i=0;i<N;i++){
+            for(let j=i+1;j<N;j++){
+                const a=pts[i], b=pts[j];
+                const dx=a.x-b.x, dy=a.y-b.y; const d2=dx*dx+dy*dy; if(d2<9000){
+                    const alpha = 1 - d2/9000; ctx.strokeStyle='rgba(131,201,255,'+(0.15*alpha)+')'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+                }
+            }
+        }
+        // light parallax on mouse move
+        const par = (e)=>{
+            const kx=(e.clientX/w-0.5)*2, ky=(e.clientY/h-0.5)*2;
+            for(const p of pts){ p.vx += 0.002*kx; p.vy += 0.002*ky; }
+        };
+        window.addEventListener('pointermove', par);
+        requestAnimationFrame(step);
+    }
+    step();
+})();
 """
 
     readme_md = f"""# {name} – Portfolio
@@ -207,7 +274,12 @@ This is a simple static portfolio site generated from your resume.
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as z:
         z.writestr("index.html", index_html)
         z.writestr("styles.css", styles_css)
+        z.writestr("main.js", main_js)
         z.writestr("README.md", readme_md)
+        # Include resume.txt fallback for the Download Resume button when no external URL
+        raw_text = (resume or {}).get("raw_text") or ""
+        if isinstance(raw_text, str) and raw_text.strip():
+            z.writestr("resume.txt", raw_text.strip())
         if include_vercel:
             z.writestr("vercel.json", vercel_json)
     buf.seek(0)
@@ -316,11 +388,18 @@ def _ai_generate_full_site(resume: Dict[str, Any], model: Optional[str] = None) 
     if isinstance(rj.get("experience"), list):
         rj["experience"] = rj["experience"][:6]
     prompt = (
-        "You are a web generator. Create a simple, responsive, single-file portfolio website from the provided resume JSON.\n"
-        "Return ONLY a minified JSON object with exactly two string keys: index_html and styles_css. No markdown, no comments.\n"
-        "index_html: a valid HTML5 document that references styles.css via <link rel=\"stylesheet\" href=\"styles.css\">.\n"
-        "The site must include: name, summary/about, contact (email/links), skills (tags), projects (cards), experience, education.\n"
-        "Choose a clean modern style. Avoid external fonts/assets. Keep inline JS minimal or none.\n\n"
+        "You are a web generator for 'Find My Stipend'. Create an eye‑catching, responsive portfolio site from the resume JSON.\n"
+        "STRICT OUTPUT: Return ONLY a minified JSON object with exactly two string keys: index_html and styles_css. No markdown fences, no comments, no extra keys.\n"
+        "index_html requirements:\n"
+        "- Valid HTML5 linking styles.css.\n"
+        "- A fixed <canvas id=\"bg\"> starfield (animated with inline JS at end of body).\n"
+        "- A centered glassy hero card with glow saying: Hi, I’m <name>.\n"
+        "- Include a small brand badge reading ‘Find My Stipend’ in a classy font treatment (no external fonts).\n"
+        "- Primary CTA buttons: gradient ‘See My Work 🚀’, ‘Contact Me’ (mailto if email present), and ‘Download Resume’ which links to resume.txt when no external resume URL exists.\n"
+        "- Below hero: sections Skills (chips), Projects (cards with title/desc/link/tech chips), Experience (role/company/period/highlights), Education.\n"
+        "- Keep markup semantic and accessible (aria labels where helpful).\n"
+        "Constraints: No external fonts or libraries. Keep all animation JS inline at the bottom of index_html (only starfield/parallax).\n"
+        "Design: rounded 20px hero, subtle neon gradients, animated hover states, high contrast, elegant.\n\n"
         f"Resume JSON:\n{json.dumps(rj, ensure_ascii=False)}\n"
     )
     payload = {
@@ -386,9 +465,20 @@ def generate_portfolio(req: PortfolioRequest, request: Request):
                 "projects": [],
                 "experience": [],
                 "education": [],
+                "raw_text": text or "",
             }
         except Exception:
-            resume = {"name": "Student", "skills": []}
+            resume = {"name": "Student", "skills": [], "raw_text": ""}
+    else:
+        # If caller passed a resume, try to augment with session raw text for embedding
+        try:
+            from main import _get_session_id, _get_session_profile  # type: ignore
+            sid = _get_session_id(request)
+            text, _ = _get_session_profile(sid)
+            if text and not resume.get("raw_text"):
+                resume["raw_text"] = text
+        except Exception:
+            pass
 
     try:
         # Optional: full-site generation via Gemini
@@ -399,6 +489,10 @@ def generate_portfolio(req: PortfolioRequest, request: Request):
                 with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as z:
                     z.writestr("index.html", ai_site["index_html"])
                     z.writestr("styles.css", ai_site["styles_css"])
+                    # Also include resume.txt if we have raw resume text
+                    raw_text = (resume or {}).get("raw_text") or ""
+                    if isinstance(raw_text, str) and raw_text.strip():
+                        z.writestr("resume.txt", raw_text.strip())
                     if req.include_vercel:
                         z.writestr("vercel.json", "{\n  \"rewrites\": [{ \"source\": \"(.*)\", \"destination\": \"/index.html\" }]\n}\n")
                 buf.seek(0)
