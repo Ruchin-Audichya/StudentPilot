@@ -7,6 +7,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+import threading
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -103,6 +104,8 @@ def _normalize(
         item["verified"] = _is_verified_by_domain(apply_url)
     else:
         item["verified"] = bool(verified)
+    # Trust scoring (0-100)
+    item["trust_score"] = _trust_score(item.get("apply_url"), item.get("title"), item.get("description"))
     item["score"] = _simple_score(item)
     return item
 
@@ -243,6 +246,246 @@ def _fetch_mahaswayam() -> List[Dict[str, Any]]:
     ]
 
 
+# --- Additional Phase 2 sources (PSUs/State Portals) ---
+def _fetch_bis() -> List[Dict[str, Any]]:
+    url = "https://www.bis.gov.in/careers/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "Bureau of Indian Standards (BIS) careers and internships."
+    return [
+        _normalize(
+            title="BIS Careers & Internships",
+            company="Bureau of Indian Standards",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["bis", "psu"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_isro() -> List[Dict[str, Any]]:
+    url = "https://www.isro.gov.in/Careers.html"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "ISRO Careers — research internships and opportunities."
+    return [
+        _normalize(
+            title="ISRO Careers & Internships",
+            company="ISRO",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["isro", "space", "research"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_iocl() -> List[Dict[str, Any]]:
+    url = "https://iocl.com/careers"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "Indian Oil (IOCL) — careers and internships."
+    return [
+        _normalize(
+            title="IOCL Careers",
+            company="Indian Oil Corporation",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["iocl", "psu"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_ongc() -> List[Dict[str, Any]]:
+    url = "https://ongcindia.com/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "ONGC — careers and internships."
+    return [
+        _normalize(
+            title="ONGC Careers",
+            company="ONGC",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["ongc", "psu"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_barc() -> List[Dict[str, Any]]:
+    url = "https://www.barc.gov.in/careers/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "BARC — internships and research opportunities."
+    return [
+        _normalize(
+            title="BARC Careers",
+            company="BARC",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["barc", "research", "psu"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_nats() -> List[Dict[str, Any]]:
+    url = "https://www.mhrdnats.gov.in/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "NATS — National Apprenticeship Training Scheme portal."
+    return [
+        _normalize(
+            title="NATS (Apprenticeships)",
+            company="MHRD NATS",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["nats", "apprenticeship"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_sebi() -> List[Dict[str, Any]]:
+    url = "https://www.sebi.gov.in/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "SEBI — careers, internships, and notices."
+    return [
+        _normalize(
+            title="SEBI Careers",
+            company="SEBI",
+            location="India",
+            state="All",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["sebi", "regulator"],
+            verified=None,
+        )
+    ]
+
+
+def _fetch_tn_naanmudhalvan() -> List[Dict[str, Any]]:
+    url = "https://www.naanmudhalvan.tn.gov.in/"
+    title, desc = _page_meta(url)
+    if not title and not desc:
+        desc = "Tamil Nadu — Naan Mudhalvan opportunities portal."
+    return [
+        _normalize(
+            title="Naan Mudhalvan (TN)",
+            company="Govt. of Tamil Nadu",
+            location="Tamil Nadu, India",
+            state="Tamil Nadu",
+            stipend=None,
+            apply_url=url,
+            description=desc or title,
+            tags=["tamil nadu", "state"],
+            verified=None,
+        )
+    ]
+
+
+# --- Trust scoring & Moderation ---
+_MOD_LOCK = threading.Lock()
+_MOD_FILE = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data", "gov_moderation.json"))
+_MOD_DECISIONS: Dict[str, set] = {"approved": set(), "flagged": set()}
+
+
+def _load_mod():
+    try:
+        with open(_MOD_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            _MOD_DECISIONS["approved"] = set(data.get("approved", []))
+            _MOD_DECISIONS["flagged"] = set(data.get("flagged", []))
+    except Exception:
+        _MOD_DECISIONS["approved"] = set()
+        _MOD_DECISIONS["flagged"] = set()
+
+
+def _save_mod():
+    try:
+        with _MOD_LOCK:
+            os.makedirs(os.path.dirname(_MOD_FILE), exist_ok=True)
+            with open(_MOD_FILE, "w", encoding="utf-8") as f:
+                json.dump({
+                    "approved": sorted(list(_MOD_DECISIONS["approved"])),
+                    "flagged": sorted(list(_MOD_DECISIONS["flagged"]))
+                }, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _trust_score(url: Optional[str], title: Optional[str], desc: Optional[str]) -> float:
+    try:
+        s = 50.0
+        host = (urlparse(url or "").hostname or "").lower()
+        scheme = (urlparse(url or "").scheme or "").lower()
+        if host.endswith(".gov.in") or host.endswith(".nic.in"):
+            s += 35
+        whitelist = {
+            "aicte-india.org", "mygov.in", "drdo.gov.in", "mahaswayam.gov.in",
+            "bis.gov.in", "isro.gov.in", "mhrdnats.gov.in", "sebi.gov.in",
+        }
+        if any(host == d or host.endswith("." + d) for d in whitelist):
+            s += 15
+        if scheme == "https":
+            s += 5
+        text = f"{title or ''} {desc or ''}".lower()
+        for kw in ["internship", "apprentice", "government", "portal", "careers"]:
+            if kw in text:
+                s += 2
+        # Penalize unknown commercial hosts slightly
+        if host and not (host.endswith(".gov.in") or host.endswith(".nic.in")) and not any(host == d or host.endswith("." + d) for d in whitelist):
+            s -= 10
+        return float(max(0.0, min(100.0, s)))
+    except Exception:
+        return 50.0
+
+
+class ModAction(BaseModel):
+    url: str
+
+
+class EligibilityProfile(BaseModel):
+    degree: Optional[str] = None
+    year: Optional[int] = None  # 1-4 typical
+    location: Optional[str] = None
+    skills: Optional[List[str]] = None
+
+
+class EligibilityRequest(BaseModel):
+    job: Dict[str, Any]
+    profile: EligibilityProfile
+
+
+class EligibilityResponse(BaseModel):
+    eligible: bool
+    score: float
+    reasons: List[str]
+
+
 def _dedup(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     seen: set = set()
     out: List[Dict[str, Any]] = []
@@ -282,6 +525,12 @@ def _aggregate_live() -> List[Dict[str, Any]]:
         items.extend(_fetch_mahaswayam())
     except Exception:
         pass
+    # Phase 2 sources
+    for f in (_fetch_bis, _fetch_isro, _fetch_iocl, _fetch_ongc, _fetch_barc, _fetch_nats, _fetch_sebi, _fetch_tn_naanmudhalvan):
+        try:
+            items.extend(f())
+        except Exception:
+            pass
 
     # Bring in seeded examples as well (acts as fallback + examples)
     try:
@@ -385,3 +634,75 @@ def get_cache_info() -> Dict[str, Any]:
         "ttl_seconds": _TTL_SECONDS,
         "items": len(_CACHE.get("items", [])),
     }
+
+
+# --- Moderation & Eligibility Endpoints ---
+@router.get("/mod/pending")
+def list_pending_mod(threshold: float = 70.0) -> Dict[str, Any]:
+    """Return low-trust items that are neither approved nor flagged."""
+    _load_mod()
+    items = _get_cached_items(force=False)
+    out = []
+    for it in items:
+        url = (it.get("apply_url") or it.get("url") or "").strip()
+        if not url:
+            continue
+        if url in _MOD_DECISIONS["approved"] or url in _MOD_DECISIONS["flagged"]:
+            continue
+        if float(it.get("trust_score", 0.0)) < threshold:
+            out.append(it)
+    return {"results": out, "count": len(out)}
+
+
+@router.post("/mod/approve")
+def mod_approve(act: ModAction) -> Dict[str, Any]:
+    _load_mod()
+    with _MOD_LOCK:
+        _MOD_DECISIONS["approved"].add(act.url)
+    _save_mod()
+    return {"ok": True}
+
+
+@router.post("/mod/flag")
+def mod_flag(act: ModAction) -> Dict[str, Any]:
+    _load_mod()
+    with _MOD_LOCK:
+        _MOD_DECISIONS["flagged"].add(act.url)
+    _save_mod()
+    return {"ok": True}
+
+
+def _eligibility_check(job: Dict[str, Any], profile: EligibilityProfile) -> EligibilityResponse:
+    deg = (profile.degree or "").lower()
+    year = profile.year or 0
+    loc = (profile.location or "").lower()
+    skills = [s.lower() for s in (profile.skills or [])]
+    text = f"{job.get('title','')} {job.get('description','')} {' '.join(job.get('tags') or [])}".lower()
+    reasons: List[str] = []
+    score = 70.0
+    eligible = True
+    # Degree hints
+    if "b.tech" in text or "btech" in text or "be" in text:
+        if not any(k in deg for k in ["b.tech", "btech", "be"]):
+            reasons.append("Prefers B.Tech/BE")
+            score -= 15
+    # Year hints
+    if "final year" in text or "pre-final" in text:
+        if year and year < 3:
+            reasons.append("Typically for pre-final/final year")
+            score -= 20
+    # Location preference (soft)
+    state = (job.get("location") or "").lower()
+    if state and loc and state not in loc:
+        reasons.append("Location preference may apply")
+        score -= 5
+    # Skills overlap (soft boost)
+    hits = [s for s in skills if s and s in text]
+    score += min(10, len(set(hits)) * 3)
+    eligible = score >= 50
+    return EligibilityResponse(eligible=eligible, score=float(max(0, min(100, score))), reasons=reasons)
+
+
+@router.post("/eligible")
+def check_eligibility(req: EligibilityRequest) -> EligibilityResponse:
+    return _eligibility_check(req.job, req.profile)
