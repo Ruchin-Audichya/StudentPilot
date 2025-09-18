@@ -95,11 +95,19 @@ export default function GovSnapshot() {
   // Derived items by selected source filters
   const filteredItems = useMemo(() => {
     if (!selectedSources.length) return items;
-    const hasTag = (x: any, t: string) => {
-      const tags: string[] = (x.required_skills || x.tags || []).map((v: any) => String(v).toLowerCase());
-      return tags.includes(t);
+    const getTags = (x: any) => (x.required_skills || x.tags || []).map((v: any) => String(v).toLowerCase());
+    const src = (x: any) => String(x.source || "").toLowerCase();
+    const synonyms: Record<string, string[]> = {
+      "tamil nadu": ["tamil nadu", "tamilnadu", "tn"],
+      maharashtra: ["maharashtra", "mahaswayam", "maha"],
     };
-    return items.filter(x => selectedSources.some(s => hasTag(x, s)));
+    const matchesKey = (x: any, key: string) => {
+      const keys = [key, ...(synonyms[key] || [])];
+      const tags = getTags(x);
+      const s = src(x);
+      return keys.some(k => tags.includes(k) || s.includes(k));
+    };
+    return items.filter(x => selectedSources.some(s => matchesKey(x, s)));
   }, [items, selectedSources]);
 
   const resultCount = filteredItems.length;
@@ -142,6 +150,12 @@ export default function GovSnapshot() {
             Show only verified
           </label>
           <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setRefreshKey(k => k + 1)}
+              disabled={loading}
+              aria-busy={loading}
+              className="text-sm px-3 py-2 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            >{loading ? 'Searching…' : 'Search'}</button>
             <button onClick={() => download(csv, `gov-snapshot-${Date.now()}.csv`, "text/csv")}
               className="text-sm px-3 py-2 rounded-md bg-white/5 border border-card-border hover:bg-white/10">Export CSV</button>
             <button onClick={() => download(json, `gov-snapshot-${Date.now()}.json`, "application/json")}
@@ -174,33 +188,43 @@ export default function GovSnapshot() {
           )}
         </div>
 
-        {/* Source filter pills */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {[
-            { key: "aicte", label: "AICTE" },
-            { key: "ncs", label: "NCS" },
-            { key: "mygov", label: "MyGov" },
-            { key: "drdo", label: "DRDO" },
-            { key: "niti", label: "NITI Aayog" },
-            { key: "maharashtra", label: "MahaSwayam" },
-          ].map((s) => {
-            const active = selectedSources.includes(s.key);
-            return (
-              <button
-                key={s.key}
-                onClick={() => setSelectedSources((prev) => active ? prev.filter(x => x !== s.key) : [...prev, s.key])}
-                className={`text-xs px-3 py-1.5 rounded-full border transition ${active ? "bg-white/10 border-white/20" : "bg-white/5 border-card-border hover:bg-white/10"}`}
-              >
-                {s.label}
+        {/* Sticky source filter bar */}
+        <div className="sticky top-14 z-20 mb-4 -mx-4 sm:mx-0 px-4 sm:px-0">
+          <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur px-3 py-2 flex flex-wrap gap-2 items-center">
+            {[
+              { key: "aicte", label: "AICTE" },
+              { key: "ncs", label: "NCS" },
+              { key: "mygov", label: "MyGov" },
+              { key: "drdo", label: "DRDO" },
+              { key: "niti", label: "NITI Aayog" },
+              { key: "maharashtra", label: "MahaSwayam" },
+              { key: "bis", label: "BIS" },
+              { key: "isro", label: "ISRO" },
+              { key: "iocl", label: "IOCL" },
+              { key: "ongc", label: "ONGC" },
+              { key: "barc", label: "BARC" },
+              { key: "nats", label: "NATS" },
+              { key: "sebi", label: "SEBI" },
+              { key: "tamil nadu", label: "TN Portal" },
+            ].map((s) => {
+              const active = selectedSources.includes(s.key);
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => setSelectedSources((prev) => active ? prev.filter(x => x !== s.key) : [...prev, s.key])}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition ${active ? "bg-white/10 border-white/20" : "bg-white/5 border-card-border hover:bg-white/10"}`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+            {selectedSources.length > 0 && (
+              <button onClick={() => setSelectedSources([])} className="text-xs px-3 py-1.5 rounded-full border bg-white/5 border-card-border hover:bg-white/10">
+                Clear
               </button>
-            );
-          })}
-          {selectedSources.length > 0 && (
-            <button onClick={() => setSelectedSources([])} className="text-xs px-3 py-1.5 rounded-full border bg-white/5 border-card-border hover:bg-white/10">
-              Clear filters
-            </button>
-          )}
-          <div className="ml-auto text-xs text-muted-foreground self-center">{resultCount} result{resultCount === 1 ? "" : "s"}</div>
+            )}
+            <div className="ml-auto text-xs text-muted-foreground">{resultCount} result{resultCount === 1 ? "" : "s"}</div>
+          </div>
         </div>
 
         {error && <div className="text-sm text-rose-300 mb-4">{error}</div>}
@@ -219,7 +243,14 @@ export default function GovSnapshot() {
         )}
 
         {!loading && resultCount === 0 && (
-          <div className="text-sm text-muted-foreground">No results. Try clearing filters, or refresh the cache if you’re an admin.</div>
+          <div className="glass-card rounded-2xl p-5">
+            <div className="font-medium mb-2">No results</div>
+            <p className="text-sm text-muted-foreground mb-3">Try clearing filters, selecting another state, or toggling sources. You can also try a fresh search to scrape the latest opportunities.</p>
+            <button
+              onClick={() => setRefreshKey(k => k + 1)}
+              className="text-sm px-3 py-2 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20"
+            >Search now</button>
+          </div>
         )}
 
         {!loading && resultCount > 0 && (
