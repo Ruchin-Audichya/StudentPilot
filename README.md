@@ -1,16 +1,20 @@
 <div align="center">
 
-<div align="center">
-
-	<img src="./public/mascot.svg" alt="Find My Stipend Mascot" width="120" height="120" />
+	<img src="./public/wms-mascot.svg" alt="WMS Mascot" width="140" height="140" />
 
 	<h1>Find My Stipend</h1>
-	<p>Find internships faster. Build your portfolio. Connect with real recruiters.</p>
+	<p>Find internships faster. Build a portfolio in one click. Connect with real recruiters.</p>
 
 	<p>
 		<a href="#features"><img alt="features" src="https://img.shields.io/badge/Features-rich-7A5CFF?style=for-the-badge"/></a>
 		<a href="#quickstart"><img alt="quickstart" src="https://img.shields.io/badge/Quickstart-1%20min-5AD7FF?style=for-the-badge"/></a>
+		<a href="#hackathon-pitch"><img alt="pitch" src="https://img.shields.io/badge/Hackathon-ready-FF6D00?style=for-the-badge"/></a>
 		<a href="#license"><img alt="license" src="https://img.shields.io/badge/License-MIT-00C2A8?style=for-the-badge"/></a>
+	</p>
+
+	<p>
+		<a href="https://wms-virid-six.vercel.app" target="_blank">Live Frontend</a> ·
+		<a href="https://studentpilot.onrender.com/health" target="_blank">Backend Health</a>
 	</p>
 
 	<img src="./public/placeholder.svg" alt="Hero" width="720" />
@@ -18,7 +22,7 @@
 
 ---
 
-Find My Stipend is a full-stack app that blends multiple job sources (Internshala, LinkedIn, company ATS careers) with resume-aware ranking, an AI-powered portfolio generator (Gemini), and HR tooling that surfaces real recruiter profiles to connect with—ready for Render + Vercel deployment.
+Find My Stipend blends multiple job sources (Internshala, LinkedIn, ATS company careers) with resume‑aware ranking, an AI portfolio generator (Gemini full‑site or fast template), and HR tools that surface real recruiter profiles — deployed on Render + Vercel.
 
 ## Table of Contents
 - [Features](#features)
@@ -89,12 +93,6 @@ Find My Stipend is a full-stack app that blends multiple job sources (Internshal
 Prereqs: Node 18+, Python 3.11+, Git
 
 ```powershell
-
-<br/>
-
-<img alt="Hero" src="public/placeholder.svg" width="680"/>
-
-</div>
 
 ## ✨ What it does
 - Finds real internships from multiple sources (Internshala, LinkedIn, company careers like Lever/Greenhouse/SmartRecruiters/Workday) and ranks them to your resume.
@@ -207,6 +205,11 @@ Optional:
 ```powershell
 pytest -q -k "analyzer or messages or portfolio"
 ```
+
+## 🏆 Hackathon Pitch (3 min)
+- Theme: Smart Education / Employment (e.g., Rajasthan listing shows “Internship/Industrial Training with Placement Opportunity”).
+- Story: Student uploads resume → Analyzer highlights gaps → HR Links → Search results with Apply Now → Mock Interview → One‑click Portfolio → Share success story.
+- Differentiators: Resume‑aware ranking, HR connect tooling, full‑site portfolio generator, robust fallbacks (works even if AI is down).
 
 ## 🗺️ 3‑min pitch
 - Pain → Vision → Demo: upload resume → analyzer → HR links → search results (Apply Now) → mock interview (speak, barge‑in, feedback) → one‑click portfolio → real testimonials.
