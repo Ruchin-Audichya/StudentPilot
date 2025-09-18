@@ -12,11 +12,11 @@ export default function TopNav({ actions = [] as Action[] }) {
     { label: "🏛️ Gov Snapshot", to: "/gov-snapshot" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
-    <nav className="sticky top-0 z-30 w-screen left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur border-b border-white/10 text-white">
+    <nav className="sticky top-0 z-30 w-full bg-black/60 backdrop-blur border-b border-white/10 text-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
-        <h1 className="text-base sm:text-lg font-bold tracking-tight">
+        <Link to="/" className="text-base sm:text-lg font-bold tracking-tight">
           Find My Stipend<span className="align-super">®</span>
-        </h1>
+        </Link>
         {/* Desktop actions (Landing-style: lightweight text links) */}
         <div className="hidden sm:flex flex-wrap items-center gap-3 sm:gap-5">
           {mergedActions.map((a) => (
