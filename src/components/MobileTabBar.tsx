@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, LayoutDashboard, MessageCircle, FileText, MoreHorizontal, Radar } from "lucide-react";
+import { Home, LayoutDashboard, MessageCircle, FileText, MoreHorizontal, Radar, Landmark } from "lucide-react";
 
 export default function MobileTabBar() {
   const nav = useNavigate();
@@ -30,6 +30,7 @@ export default function MobileTabBar() {
           <Item icon={Home} label="Home" to="/" />
           <Item icon={LayoutDashboard} label="Dashboard" to="/dashboard" />
           <Item icon={Radar} label="OppRadar" to="/oppradar" />
+          <Item icon={Landmark} label="Gov" to="/gov-snapshot" />
           <Item icon={MessageCircle} label="Chat" to="/chat" />
           <Item icon={FileText} label="Resume" to="/resume-genius" />
           <button
