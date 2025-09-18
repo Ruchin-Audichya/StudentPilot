@@ -3,6 +3,7 @@ import TopNav from "@/components/TopNav";
 import { fetchGovFeeds } from "@/services/govApi";
 import { API_BASE } from "@/lib/apiBase";
 import JobCard from "@/components/JobCard";
+import { useMemo as _useMemo } from "react";
 
 type Row = {
   title: string; company: string; location: string; stipend?: string; url?: string; score?: number; verified?: boolean; source?: string;
@@ -20,6 +21,8 @@ export default function GovSnapshot() {
   const isAdmin = (qp.get("admin") === "1");
   const [selectedSources, setSelectedSources] = useState<string[]>([]); // aicte,ncs,mygov,drdo,niti,maharashtra
   const commonStates = ["All","Rajasthan","Maharashtra","Delhi","Karnataka","Tamil Nadu","Gujarat"];
+  const [pending, setPending] = useState<any[]>([]);
+  const [modLoading, setModLoading] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -44,6 +47,23 @@ export default function GovSnapshot() {
     };
     run();
   }, [stateFilter, onlyVerified, refreshKey]);
+
+  // Admin: load pending low-trust items
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      setModLoading(true);
+      try {
+        const r = await fetch(`${API_BASE}/api/gov/mod/pending?threshold=70`);
+        const d = await r.json();
+        setPending(Array.isArray(d?.results) ? d.results : []);
+      } catch {
+        setPending([]);
+      } finally {
+        setModLoading(false);
+      }
+    })();
+  }, [isAdmin, refreshKey]);
 
   const csv = useMemo(() => {
     const rows: Row[] = items.map((x: any) => ({
@@ -205,9 +225,80 @@ export default function GovSnapshot() {
         {!loading && resultCount > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredItems.map((job, i) => (
-              <JobCard key={job.id || i} job={job} />
+              <div key={job.id || i} className="relative">
+                {/* Trust score badge (admin view) */}
+                {isAdmin && typeof (job as any).trust_score === 'number' && (
+                  <span className="absolute -top-2 -left-2 text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">Trust {(job as any).trust_score}</span>
+                )}
+                <JobCard job={job} />
+                {/* Eligibility CTA */}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const profile = (() => {
+                          try { return JSON.parse(localStorage.getItem('onboarding') || 'null') || {}; } catch { return {}; }
+                        })();
+                        const r = await fetch(`${API_BASE}/api/gov/eligible`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job: job, profile: {
+                          degree: profile?.branch || undefined,
+                          year: Number(profile?.year) || undefined,
+                          location: profile?.location || undefined,
+                          skills: Array.isArray(profile?.skills) ? profile.skills : [],
+                        } }) });
+                        const d = await r.json();
+                        alert(`${d.eligible ? 'Likely eligible' : 'May not be eligible'} (score: ${Math.round(d.score)}).\n${(d.reasons||[]).join('\n')}`);
+                      } catch (e) {
+                        alert('Could not check eligibility.');
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-card-border hover:bg-white/10"
+                  >Am I eligible?</button>
+                </div>
+              </div>
             ))}
           </div>
+        )}
+
+        {/* Admin moderation panel */}
+        {isAdmin && (
+          <section className="mt-8">
+            <h2 className="text-sm font-semibold mb-2">Pending moderation (low trust)</h2>
+            {modLoading && <div className="text-xs text-muted-foreground">Loading pending…</div>}
+            {!modLoading && pending.length === 0 && <div className="text-xs text-muted-foreground">None pending.</div>}
+            {!modLoading && pending.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {pending.map((p, idx) => (
+                  <div key={idx} className="glass-card rounded-2xl p-4 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold text-sm line-clamp-2">{p.title}</div>
+                      {typeof p.trust_score === 'number' && (
+                        <span className="px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">{Math.round(p.trust_score)}</span>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground mt-1 line-clamp-2">{p.company} • {p.location}</div>
+                    <div className="mt-2 line-clamp-3">{p.description}</div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <a href={p.apply_url || p.url} target="_blank" className="text-xs underline">Open</a>
+                      <button
+                        onClick={async () => {
+                          await fetch(`${API_BASE}/api/gov/mod/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: p.apply_url || p.url }) });
+                          setRefreshKey(k => k + 1);
+                        }}
+                        className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                      >Approve</button>
+                      <button
+                        onClick={async () => {
+                          await fetch(`${API_BASE}/api/gov/mod/flag`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: p.apply_url || p.url }) });
+                          setRefreshKey(k => k + 1);
+                        }}
+                        className="text-xs px-2 py-1 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                      >Flag</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         )}
       </main>
     </div>
