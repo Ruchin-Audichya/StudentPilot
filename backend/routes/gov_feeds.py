@@ -253,8 +253,11 @@ def get_gov_feeds(f: GovFilter) -> Dict[str, Any]:
     return {"results": out, "count": len(out)}
 
 
+from fastapi import Query
+
+
 @router.post("/feeds/live")
-def get_gov_feeds_live(f: GovFilter, force: bool = False) -> Dict[str, Any]:
+def get_gov_feeds_live(f: GovFilter, force: bool = Query(False, description="Bypass cache and refresh")) -> Dict[str, Any]:
     """Live aggregation with caching. Falls back internally to seeds if sources fail."""
     items = _get_cached_items(force=force)
 
@@ -273,3 +276,12 @@ def get_gov_feeds_live(f: GovFilter, force: bool = False) -> Dict[str, Any]:
     out.sort(key=lambda x: (x.get("score") or 0), reverse=True)
     out = out[: f.limit]
     return {"results": out, "count": len(out), "cached_at": _CACHE.get("ts", 0.0)}
+
+
+@router.get("/feeds/cache-info")
+def get_cache_info() -> Dict[str, Any]:
+    return {
+        "cached_at": _CACHE.get("ts", 0.0),
+        "ttl_seconds": _TTL_SECONDS,
+        "items": len(_CACHE.get("items", [])),
+    }

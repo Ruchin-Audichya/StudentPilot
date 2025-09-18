@@ -1,7 +1,7 @@
 import { API_BASE } from "@/lib/apiBase";
 import type { JobResult } from "@/services/jobApi";
 
-export async function fetchGovFeeds(opts: { state?: string; only_verified?: boolean; limit?: number }): Promise<JobResult[]> {
+export async function fetchGovFeeds(opts: { state?: string; only_verified?: boolean; limit?: number; _force?: boolean }): Promise<JobResult[]> {
   const payload = {
     state: opts.state || undefined,
     only_verified: !!opts.only_verified,
@@ -21,7 +21,8 @@ export async function fetchGovFeeds(opts: { state?: string; only_verified?: bool
   let data: any;
   try {
     // Prefer live aggregated + cached endpoint
-    data = await request(`/api/gov/feeds/live`);
+    const livePath = `/api/gov/feeds/live${opts._force ? `?t=${Date.now()}` : ""}`;
+    data = await request(livePath);
   } catch {
     // Fallback to seeded endpoint
     data = await request(`/api/gov/feeds`);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { fetchGovFeeds } from "@/services/govApi";
+import { API_BASE } from "@/lib/apiBase";
 import JobCard from "@/components/JobCard";
 
 type Row = {
@@ -13,14 +14,24 @@ export default function GovSnapshot() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const run = async () => {
       setLoading(true); setError(null);
       try {
-        // Prefer live endpoint by using higher limit; backend decides the route on server
-        const res = await fetchGovFeeds({ state: stateFilter || undefined, only_verified: onlyVerified, limit: 100 });
+        // Prefer live endpoint via service; refreshKey triggers a bypass
+        const res: any = await (fetchGovFeeds as any)({ state: stateFilter || undefined, only_verified: onlyVerified, limit: 100, _force: refreshKey > 0 });
+        // Service returns normalized JobResult[]; also attempt to fetch cache-info for timestamp
         setItems(res);
+        try {
+          const r = await fetch(`${API_BASE}/api/gov/feeds/cache-info`);
+          if (r.ok) {
+            const meta = await r.json();
+            setCachedAt(typeof meta.cached_at === "number" ? meta.cached_at : null);
+          }
+        } catch {}
       } catch (e: any) {
         setError(e?.message || "Failed to load feeds");
       } finally {
@@ -28,7 +39,7 @@ export default function GovSnapshot() {
       }
     };
     run();
-  }, [stateFilter, onlyVerified]);
+  }, [stateFilter, onlyVerified, refreshKey]);
 
   const csv = useMemo(() => {
     const rows: Row[] = items.map((x: any) => ({
@@ -80,11 +91,16 @@ export default function GovSnapshot() {
               className="text-sm px-3 py-2 rounded-md bg-white/5 border border-card-border hover:bg-white/10">Export CSV</button>
             <button onClick={() => download(json, `gov-snapshot-${Date.now()}.json`, "application/json")}
               className="text-sm px-3 py-2 rounded-md bg-white/5 border border-card-border hover:bg-white/10">Export JSON</button>
+            <button onClick={() => setRefreshKey(k => k + 1)}
+              className="text-sm px-3 py-2 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20">Refresh</button>
           </div>
         </div>
 
         {error && <div className="text-sm text-rose-300 mb-4">{error}</div>}
         {loading && <div className="text-sm text-muted-foreground mb-4">Loading government feeds…</div>}
+        {!loading && cachedAt && (
+          <div className="text-xs text-muted-foreground mb-4">Last updated: {new Date(cachedAt * 1000).toLocaleString()}</div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((job, i) => (
