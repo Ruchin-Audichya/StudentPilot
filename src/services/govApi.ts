@@ -41,5 +41,6 @@ export async function fetchGovFeeds(opts: { state?: string; only_verified?: bool
     is_new: x.is_new,
     score: typeof x.score === 'number' ? x.score : undefined,
     required_skills: x.tags || [],
+    verified: !!x.verified,
   }));
 }

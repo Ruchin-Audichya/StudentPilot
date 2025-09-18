@@ -18,6 +18,8 @@ export default function GovSnapshot() {
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const isAdmin = (qp.get("admin") === "1");
+  const [selectedSources, setSelectedSources] = useState<string[]>([]); // aicte,ncs,mygov,drdo,niti,maharashtra
+  const commonStates = ["All","Rajasthan","Maharashtra","Delhi","Karnataka","Tamil Nadu","Gujarat"];
 
   useEffect(() => {
     const run = async () => {
@@ -70,10 +72,26 @@ export default function GovSnapshot() {
     URL.revokeObjectURL(url);
   };
 
+  // Derived items by selected source filters
+  const filteredItems = useMemo(() => {
+    if (!selectedSources.length) return items;
+    const hasTag = (x: any, t: string) => {
+      const tags: string[] = (x.required_skills || x.tags || []).map((v: any) => String(v).toLowerCase());
+      return tags.includes(t);
+    };
+    return items.filter(x => selectedSources.some(s => hasTag(x, s)));
+  }, [items, selectedSources]);
+
+  const resultCount = filteredItems.length;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <TopNav />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+        <header className="mb-4">
+          <h1 className="text-xl md:text-2xl font-bold">Government Snapshot</h1>
+          <p className="text-sm text-muted-foreground">Find official internship opportunities aggregated from AICTE, NCS, MyGov, DRDO, NITI Aayog, and MahaSwayam.</p>
+        </header>
         <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-3">
           <div className="flex-1">
             <label className="text-sm text-muted-foreground">State</label>
@@ -83,6 +101,21 @@ export default function GovSnapshot() {
               placeholder="e.g., Rajasthan, Maharashtra, All"
               className="mt-1 w-full rounded-lg border border-card-border bg-card px-3 py-2"
             />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {commonStates.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStateFilter(s === "All" ? "" : s)}
+                  className={`text-xs px-2.5 py-1 rounded-full border ${
+                    (s === "All" ? !stateFilter : stateFilter.toLowerCase() === s.toLowerCase())
+                      ? "bg-white/10 border-white/20"
+                      : "bg-white/5 border-card-border hover:bg-white/10"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" checked={onlyVerified} onChange={(e) => setOnlyVerified(e.target.checked)} />
@@ -121,14 +154,61 @@ export default function GovSnapshot() {
           )}
         </div>
 
-        {error && <div className="text-sm text-rose-300 mb-4">{error}</div>}
-        {loading && <div className="text-sm text-muted-foreground mb-4">Loading government feeds…</div>}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((job, i) => (
-            <JobCard key={job.id || i} job={job} />
-          ))}
+        {/* Source filter pills */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[
+            { key: "aicte", label: "AICTE" },
+            { key: "ncs", label: "NCS" },
+            { key: "mygov", label: "MyGov" },
+            { key: "drdo", label: "DRDO" },
+            { key: "niti", label: "NITI Aayog" },
+            { key: "maharashtra", label: "MahaSwayam" },
+          ].map((s) => {
+            const active = selectedSources.includes(s.key);
+            return (
+              <button
+                key={s.key}
+                onClick={() => setSelectedSources((prev) => active ? prev.filter(x => x !== s.key) : [...prev, s.key])}
+                className={`text-xs px-3 py-1.5 rounded-full border transition ${active ? "bg-white/10 border-white/20" : "bg-white/5 border-card-border hover:bg-white/10"}`}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+          {selectedSources.length > 0 && (
+            <button onClick={() => setSelectedSources([])} className="text-xs px-3 py-1.5 rounded-full border bg-white/5 border-card-border hover:bg-white/10">
+              Clear filters
+            </button>
+          )}
+          <div className="ml-auto text-xs text-muted-foreground self-center">{resultCount} result{resultCount === 1 ? "" : "s"}</div>
         </div>
+
+        {error && <div className="text-sm text-rose-300 mb-4">{error}</div>}
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="glass-card rounded-2xl p-5 animate-pulse">
+                <div className="h-4 w-2/3 bg-white/10 rounded mb-2" />
+                <div className="h-3 w-1/2 bg-white/10 rounded mb-4" />
+                <div className="h-3 w-full bg-white/10 rounded mb-1" />
+                <div className="h-3 w-5/6 bg-white/10 rounded" />
+                <div className="mt-4 h-8 w-24 bg-white/10 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && resultCount === 0 && (
+          <div className="text-sm text-muted-foreground">No results. Try clearing filters, or refresh the cache if you’re an admin.</div>
+        )}
+
+        {!loading && resultCount > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredItems.map((job, i) => (
+              <JobCard key={job.id || i} job={job} />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
