@@ -56,21 +56,30 @@ export default memo(function JobCard({ job }: Props) {
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h3 className="text-base md:text-lg font-bold break-words line-clamp-2 leading-snug">{job.title}</h3>
-          <p className="text-sm text-muted-foreground break-words">
-            {job.company ? `${job.company} • ` : ''}{job.location}
+          <p className="text-sm text-muted-foreground break-words flex items-center gap-2">
+            <span>{job.company}</span>
+            <span aria-hidden>•</span>
+            <span className="inline-flex items-center gap-1" aria-label={`Location ${job.location}`}>
+              <span role="img" aria-hidden className="text-xs">📍</span>
+              <span>{job.location}</span>
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
           {(job as any).verified && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Verified</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1" title="Verified source">
+              <span role="img" aria-hidden>✅</span>
+              <span>Verified</span>
+            </span>
           )}
           <span className="text-xs px-2 py-1 rounded-full bg-white/5 border border-card-border">{job.source || 'source'}</span>
         </div>
       </div>
 
       {job.stipend && (
-        <p className="mt-2 text-sm">
-          Stipend: <span className="font-semibold text-purple-300">{job.stipend}</span>
+        <p className="mt-2 text-sm inline-flex items-center gap-2" aria-label={`Stipend ${job.stipend}`}>
+          <span className="inline-flex items-center gap-1"><span role="img" aria-hidden>💰</span> <span>Stipend</span>:</span>
+          <span className="font-semibold text-purple-300">{job.stipend}</span>
         </p>
       )}
 

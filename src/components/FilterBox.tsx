@@ -98,6 +98,11 @@ const FilterBox: React.FC<Props> = ({
             {openMobile ? 'Hide filters' : 'Adjust filters'}
           </AccordionTrigger>
           <AccordionContent>
+            {govOnly && (
+              <div className="mb-2 text-[11px] text-muted-foreground">
+                Government mode is ON. Results prefer official sources. Add a <span className="font-medium">State</span> to refine.
+              </div>
+            )}
             {/* Quick toggles: compact + calm */}
             <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
               <button
