@@ -12,7 +12,7 @@ export default function TopNav({ actions = [] as Action[] }) {
     { label: "🏛️ Gov Snapshot", to: "/gov-snapshot" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
-    <nav className="sticky top-0 z-30 w-full bg-black/60 backdrop-blur border-b border-white/10 text-white">
+  <nav className="sticky top-0 z-30 w-full bg-black/60 backdrop-blur border-b border-white/10 text-white safe-top">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
         <Link to="/" className="text-base sm:text-lg font-bold tracking-tight">
           Find My Stipend<span className="align-super">®</span>

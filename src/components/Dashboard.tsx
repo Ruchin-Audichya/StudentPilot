@@ -415,7 +415,7 @@ export default function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-  <div className="min-h-screen overflow-x-hidden">
+  <div className="min-h-screen overflow-x-hidden with-mobile-tabbar">
       <TopNav
         actions={[
           { label: "🎙️ Mock Interview", to: "/mock-interview" },

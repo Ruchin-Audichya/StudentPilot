@@ -113,7 +113,7 @@ export default function GovSnapshot() {
   const resultCount = filteredItems.length;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground with-mobile-tabbar">
       <TopNav />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         <header className="mb-4">

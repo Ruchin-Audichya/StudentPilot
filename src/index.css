@@ -79,6 +79,23 @@
     @apply bg-card/50 backdrop-blur-xl border border-card-border;
     box-shadow: var(--shadow-card);
   }
+  /* Safe area helpers for iOS/Android notches and home indicators */
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+  .safe-left {
+    padding-left: max(env(safe-area-inset-left), 0px);
+  }
+  .safe-right {
+    padding-right: max(env(safe-area-inset-right), 0px);
+  }
+  /* When a fixed bottom tab bar is present, give content a bottom padding */
+  .with-mobile-tabbar {
+    padding-bottom: calc(64px + max(env(safe-area-inset-bottom), 0px));
+  }
   
   .gradient-primary {
     background: var(--gradient-primary);

@@ -284,7 +284,7 @@ const ProgramSection: React.FC<{ title: string; icon: React.ReactNode; programs:
 // The main App component.
 const OppRadar: React.FC = () => {
   return (
-    <div className="bg-gray-900 min-h-screen py-8 px-4 sm:px-8">
+    <div className="bg-gray-900 min-h-screen py-8 px-4 sm:px-8 with-mobile-tabbar">
       <div className="max-w-4xl mx-auto">
         <header className="text-center py-8">
           <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-400 via-purple-400 to-indigo-500 bg-clip-text text-transparent tracking-tight leading-tight">

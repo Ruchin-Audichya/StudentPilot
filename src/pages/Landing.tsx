@@ -31,7 +31,7 @@ export default function Landing() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white with-mobile-tabbar">
       {/* Navbar */}
       <nav className="sticky top-0 z-30 bg-black/60 backdrop-blur border-b border-white/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

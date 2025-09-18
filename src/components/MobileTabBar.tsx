@@ -24,8 +24,8 @@ export default function MobileTabBar() {
   );
 
   return (
-    <div className="sm:hidden fixed left-0 right-0 bottom-0 z-50">
-      <div className="mobile-tabbar bg-black/65 backdrop-blur border-t border-white/10 px-2 py-1 safe-bottom">
+    <div className="sm:hidden fixed left-0 right-0 bottom-0 z-50 safe-bottom">
+      <div className="mobile-tabbar bg-black/65 backdrop-blur border-t border-white/10 px-2 py-1">
         <div className="flex items-center justify-between gap-1">
           <Item icon={Home} label="Home" to="/" />
           <Item icon={LayoutDashboard} label="Dashboard" to="/dashboard" />

@@ -37,7 +37,10 @@ export default function App() {
         </>} />
 
   {/* OppRadar page */}
-  <Route path="/oppradar" element={<OppRadar />} />
+  <Route path="/oppradar" element={<>
+          <OppRadar />
+          {isMobile && <MobileTabBar />}
+        </>} />
 
         {/* Chat page */}
         <Route path="/chat" element={<>
@@ -46,7 +49,10 @@ export default function App() {
         </>} />
 
         {/* Government Snapshot */}
-        <Route path="/gov-snapshot" element={<GovSnapshot />} />
+        <Route path="/gov-snapshot" element={<>
+          <GovSnapshot />
+          {isMobile && <MobileTabBar />}
+        </>} />
 
         {/* Auth page */}
         <Route path="/auth" element={<AuthPage />} />
