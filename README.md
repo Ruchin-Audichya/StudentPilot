@@ -1,53 +1,93 @@
 <div align="center">
 
-<div align="center">
+  <img src="./public/wms-mascot.svg" alt="Find My Stipend Mascot" width="120" height="120" />
 
-	<img src="./public/mascot.svg" alt="Find My Stipend Mascot" width="120" height="120" />
+  <h1>Find My Stipend — Smart India Hackathon Edition</h1>
+  <p>Find internships faster. Close skill gaps. Connect with recruiters. Get placed.</p>
 
-	<h1>Find My Stipend</h1>
-	<p>Find internships faster. Build your portfolio. Connect with real recruiters.</p>
+  <p>
+    <a href="#sih-brief"><img alt="sih" src="https://img.shields.io/badge/SIH-Submission-7A5CFF?style=for-the-badge"/></a>
+    <a href="#quickstart"><img alt="quickstart" src="https://img.shields.io/badge/Quickstart-2%20mins-5AD7FF?style=for-the-badge"/></a>
+    <a href="#demo"><img alt="demo" src="https://img.shields.io/badge/Demo-links-00C2A8?style=for-the-badge"/></a>
+    <a href="#license"><img alt="license" src="https://img.shields.io/badge/License-MIT-00C2A8?style=for-the-badge"/></a>
+  </p>
 
-	<p>
-		<a href="#features"><img alt="features" src="https://img.shields.io/badge/Features-rich-7A5CFF?style=for-the-badge"/></a>
-		<a href="#quickstart"><img alt="quickstart" src="https://img.shields.io/badge/Quickstart-1%20min-5AD7FF?style=for-the-badge"/></a>
-		<a href="#license"><img alt="license" src="https://img.shields.io/badge/License-MIT-00C2A8?style=for-the-badge"/></a>
-	</p>
-
-	<img src="./public/placeholder.svg" alt="Hero" width="720" />
+  <img src="./public/placeholder.svg" alt="Hero" width="720" />
 </div>
 
 ---
 
-Find My Stipend is a full-stack app that blends multiple job sources (Internshala, LinkedIn, company ATS careers) with resume-aware ranking, an AI-powered portfolio generator (Gemini), and HR tooling that surfaces real recruiter profiles to connect with—ready for Render + Vercel deployment.
+This repository contains the working prototype of Find My Stipend (FMS), prepared for Smart India Hackathon. It blends multi‑source internship discovery with resume‑aware ranking, an AI resume analyzer, one‑click portfolio generation, and recruiter‑connect tooling. We also include a placement‑cell workflow (postings, approvals, interviews, dashboard) to support campus processes.
 
-## Table of Contents
-- [Features](#features)
-- [Demo Shots](#demo-shots)
-- [Architecture](#architecture)
-- [Quickstart](#quickstart)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Development](#development)
-- [Deploy](#deploy)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+## SIH Brief and Track Mapping {#sih-brief}
+- Theme: Smart Education / Employment
+- Problem fit: Helping students discover relevant opportunities, assess readiness, and connect with real recruiters in less time
+- Stakeholders: Students, Placement Cell, Recruiters
+- What’s unique:
+  - Resume‑aware ranking across sources (Internshala, LinkedIn, company ATS pages)
+  - Practical HR connect tooling (recruiter search/profiles) that works without private APIs
+  - Instant portfolio ZIP and resume analyzer to close gaps fast
+  - Placement workflows (mentor approvals, interview scheduler with timetable blocks, KPI dashboard)
 
-## Features
-- Blended internship search
-	- Internshala + LinkedIn + ATS company careers (Lever, Greenhouse, Workday, SmartRecruiters, generic pages)
-	- Resume-aware queries and result scoring; “hot” tags; newness signal
-	- Source filters and counts; direct company “Apply Now” links
-- LinkedIn premium signals
-	- Detects Easy Apply, promoted, actively hiring; optional Easy Apply variant
-- HR tooling that actually helps
-	- People-search links for LinkedIn (skills/roles/location)
-	- Real recruiter profiles discovery via public web search for `/in/` profiles
-	- Batch mode: grouped recruiter cards by company, with Connect buttons
-- AI portfolio generator
-	- Template + enrichment mode (fast, clean)
-	- Full-site Gemini mode: returns a complete `index.html` + `styles.css` based on your resume
-	- One-click ZIP download; Vercel/Pages friendly
-- Resume analyzer
+## Demo {#demo}
+- Frontend (Vercel): https://wms-virid-six.vercel.app
+- Backend Health (Render): https://studentpilot.onrender.com/health
+- Screenshare Script: Upload resume → Analyzer → HR Links → Jobs → Apply → Interview Scheduler → Portfolio ZIP → Placement Dashboard.
+
+## Architecture Overview
+- Frontend: React (Vite) + TypeScript + Tailwind/shadcn + Framer Motion
+- Backend: FastAPI (Python), modular routers, JSON persistence for demo
+- Scrapers: Internshala, LinkedIn (HTTP‑first), Company ATS (Lever/Greenhouse/Workday/SmartRecruiters), generic pages
+- Analytics: Department‑wise KPIs, applications per department
+- DevOps: Render (BE), Vercel (FE); health/CORS ready
+
+## Key Features
+- Internship Search (multi‑source) with resume relevance score and filters
+- Resume Genius (keywords coverage, weak points, grammar fixes)
+- AI Portfolio Generator (template and full‑site ZIP)
+- Recruiter Connect (search links and public profiles)
+- Placement System: Postings, Applications, Mentor approvals, Interview Scheduler, Feedback, Certificates, Dashboard
+
+## Quickstart (Local)
+
+Prereqs: Node 18+, Python 3.11+, Git
+
+```powershell
+# Backend
+cd backend
+pip install -r requirements.txt
+python -m uvicorn main:app --host 127.0.0.1 --port 8011 --reload
+
+# Frontend (new terminal at repo root)
+npm install
+$env:VITE_API_BASE = 'http://127.0.0.1:8011'
+npm run dev
+```
+
+Open http://127.0.0.1:5173. Health: GET http://127.0.0.1:8011/health
+
+## REST Endpoints (selected)
+- GET `/health`, `/version`
+- Resume Analyzer: POST `/api/analyze/resume-vs-jobs`
+- Internships Multi‑source: POST `/api/search`
+- Recruiter Links/Profiles: POST `/api/linkedin/hr-links`, `/api/linkedin/hr-profiles`
+- Portfolio: POST `/api/portfolio/generate`
+- Placement: `/api/postings`, `/api/applications`, `/api/interviews`, `/api/feedback`, `/api/dashboard`
+
+## Testing
+```powershell
+pytest -q -k "analyzer or messages"    # quick slice
+npm run build                           # FE production build
+```
+
+## Submission Notes
+- Works offline with JSON storage for demo (no external DB required)
+- Env keys are optional; if missing, features fall back to heuristic templates
+- CORS is configured; health endpoint exposed
+- Code is structured for extension with a real DB later
+
+## License
+MIT — © 2025 Find My Stipend team
 	- Missing keywords, AI-flagged weak points, grammar fixes
 - Smooth UI
 	- React + Vite + TypeScript + Tailwind/shadcn; animations via Framer Motion
