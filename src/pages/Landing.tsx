@@ -3,6 +3,7 @@ import { FaGithub, FaLinkedin } from "react-icons/fa";
 import { FileText, Sparkles, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 import resumeImg from "@/assets/resume.png"; // Using PNG for the resume image
+import HeroCarousel from "@/components/HeroCarousel";
 import HireProofModal from "@/components/HireProofModal";
 import { fetchTestimonials, Testimonial } from "@/services/testimonials";
 import { Link } from "react-router-dom";
@@ -133,16 +134,26 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Image */}
+      {/* Hero Carousel */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative mx-auto w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl">
-          <img
-            src={resumeImg}
-            alt="Resume"
-            className="block w-full rounded-xl shadow-2xl ring-1 ring-white/10 object-contain"
-          />
-          <div className="pointer-events-none absolute -inset-6 -z-10 rounded-2xl bg-gradient-to-r from-white/10 to-white/0 blur-2xl" />
-        </div>
+        <HeroCarousel
+          className="mx-auto max-w-5xl"
+          slides={[
+            { src: "/posters/campus-connect-hero.png", alt: "Campus Connect hero", caption: "Campus — Targeted notices & real-time updates" },
+            { src: "/posters/one-portal-two-wins.png", alt: "One portal, two wins", caption: "Students & Admins — one place for everything" },
+            { src: "/posters/find-your-dream-internship.png", alt: "Find your dream internship", caption: "Resume-aware internships & AI prep" },
+          ]}
+        />
+
+        {/* Fallback static image for when posters are absent */}
+        <noscript>
+          {/* Raw HTML to avoid JSX class/className issues when JS is disabled */}
+          <div dangerouslySetInnerHTML={{ __html: `
+            <div class="relative mx-auto w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl">
+              <img src="/resume.png" alt="Resume" class="block w-full rounded-xl shadow-2xl ring-1 ring-white/10 object-contain" />
+            </div>
+          `}} />
+        </noscript>
       </div>
 
       {/* Features */}
