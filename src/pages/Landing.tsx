@@ -134,8 +134,20 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Hero Carousel */}
+      {/* Original Image (restored) */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative mx-auto w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl">
+          <img
+            src={resumeImg}
+            alt="Resume preview"
+            className="block w-full rounded-xl shadow-2xl ring-1 ring-white/10 object-contain"
+          />
+          <div className="pointer-events-none absolute -inset-6 -z-10 rounded-2xl bg-gradient-to-r from-white/10 to-white/0 blur-2xl" />
+        </div>
+      </div>
+
+      {/* Hero Carousel */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 md:mt-10">
         <HeroCarousel
           className="mx-auto max-w-5xl"
           slides={[

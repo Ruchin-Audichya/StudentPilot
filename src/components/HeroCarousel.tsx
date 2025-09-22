@@ -36,7 +36,7 @@ export default function HeroCarousel({ slides, intervalMs = 4000, className }: P
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 ${className || ''}`}
+      className={`relative overflow-hidden rounded-2xl border border-white/10 bg-black ${className || ''}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={(e) => { touchStartX.current = e.touches[0]?.clientX ?? null; }}
@@ -50,14 +50,15 @@ export default function HeroCarousel({ slides, intervalMs = 4000, className }: P
       }}
     >
       {/* Slides */}
-      <div className="relative aspect-[4/3] md:aspect-[16/9]">
+      <div className="relative aspect-[4/3] md:aspect-[16/9] bg-black">
         {slides.map((s, i) => (
           <img
             key={i}
             src={s.src}
             alt={s.alt}
             loading="lazy"
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${i === index ? 'opacity-100' : 'opacity-0'}`}
+            draggable={false}
+            className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-700 ${i === index ? 'opacity-100' : 'opacity-0'}`}
           />
         ))}
       </div>
