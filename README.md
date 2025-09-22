@@ -35,6 +35,20 @@ This repository contains the working prototype of Find My Stipend (FMS), prepare
 - Backend Health (Render): https://studentpilot.onrender.com/health
 - Screenshare Script: Upload resume → Analyzer → HR Links → Jobs → Apply → Interview Scheduler → Portfolio ZIP → Placement Dashboard.
 
+### Posters
+
+These are used in the landing page carousel (place files under `public/posters/`).
+
+<div align="center">
+
+<img src="public/posters/campus-connect-hero.png" alt="Campus Connect" width="420"/>
+
+<img src="public/posters/one-portal-two-wins.png" alt="One portal, two wins" width="420"/>
+
+<img src="public/posters/find-your-dream-internship.png" alt="Find your dream internship" width="420"/>
+
+</div>
+
 ## Architecture Overview
 - Frontend: React (Vite) + TypeScript + Tailwind/shadcn + Framer Motion
 - Backend: FastAPI (Python), modular routers, JSON persistence for demo
