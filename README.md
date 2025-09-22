@@ -12,7 +12,7 @@
     <a href="#license"><img alt="license" src="https://img.shields.io/badge/License-MIT-00C2A8?style=for-the-badge"/></a>
   </p>
 
-  <img src="./public/placeholder.svg" alt="Hero" width="720" />
+  <img src="./public/posters/Poster 1.png" alt="Hero" width="720" />
 </div>
 
 ![Campus Connect Hero](assets/campus-connect-hero.png)
