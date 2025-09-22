@@ -58,7 +58,7 @@ def analyze(req: AnalyzeRequest, request: Request) -> Dict[str, Any]:
     if not text:
         raise HTTPException(status_code=400, detail="resume_text is empty and no session resume found")
 
-    jobs = [j.dict() for j in req.jobs]
+    jobs = [j.model_dump() for j in req.jobs]
     result = analyze_resume_vs_jobs(text, skills, jobs, top_job_keywords=req.top_job_keywords, top_missing=req.top_missing)  # type: ignore
 
     # Optionally enhance with AI suggestions via Gemini if configured

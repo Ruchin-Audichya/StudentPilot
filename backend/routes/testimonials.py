@@ -1,7 +1,7 @@
 import os
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
@@ -41,7 +41,7 @@ def _load_all() -> List[Testimonial]:
 
 def _save_all(items: List[Testimonial]):
     with open(_JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump([item.dict() for item in items], f, ensure_ascii=False, indent=2)
+        json.dump([item.model_dump() for item in items], f, ensure_ascii=False, indent=2)
 
 
 @router.get("/", response_model=List[Testimonial])
@@ -71,7 +71,7 @@ async def submit_testimonial(
     proof: Optional[UploadFile] = File(None),
 ):
     tid = uuid.uuid4().hex
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at = datetime.now(timezone.utc).isoformat()
 
     image_url = None
     if proof is not None:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
 from pydantic import BaseModel
 import os, sqlite3, json, threading, time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "campus.db"))
@@ -48,7 +48,7 @@ router = APIRouter(prefix="/api/v1/placement", tags=["placement"])
 def _uuid():
     import uuid; return uuid.uuid4().hex
 
-def _now(): return datetime.utcnow().isoformat()
+def _now(): return datetime.now(timezone.utc).isoformat()
 
 def _user_id(request: Optional[Request]):
     try: return (request.headers.get('x-user-id') or '').strip() or None

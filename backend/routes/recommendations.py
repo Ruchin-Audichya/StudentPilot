@@ -35,7 +35,7 @@ class RankRequest(BaseModel):
 @router.post("/rank")
 def rank(req: RankRequest):
     try:
-        ranked = rank_internships(req.resume.dict(), [j.dict() for j in req.jobs], k=req.k)
+        ranked = rank_internships(req.resume.model_dump(), [j.model_dump() for j in req.jobs], k=req.k)
         return {"results": ranked, "count": len(ranked)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

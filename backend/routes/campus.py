@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 import sqlite3, os, json, time, threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "campus.db")
@@ -72,7 +72,7 @@ def _ensure_publisher():
 def _publisher_loop():
     while True:
         try:
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             conn = _db(); cur = conn.cursor()
             rows = cur.execute("SELECT id, scheduled_at, published_at, is_draft FROM announcements").fetchall()
             for r in rows:
@@ -112,7 +112,7 @@ def _uuid():
     return uuid.uuid4().hex
 
 def _now_iso():
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 @router.post("/announcements")
 def create_announcement(a: AnnouncementIn, request: Request):
@@ -193,7 +193,7 @@ def mark_ack(aid: str, user_id: Optional[str] = None, request: Request = None):
 @router.get("/admin/analytics")
 def analytics():
     conn = _db(); cur = conn.cursor()
-    since = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
     reads = cur.execute("SELECT COUNT(1) AS c FROM read_receipts WHERE read_at IS NOT NULL AND read_at >= ?", (since,)).fetchone()["c"]
     acks = cur.execute("SELECT COUNT(1) AS c FROM read_receipts WHERE acknowledged_at IS NOT NULL", ()).fetchone()["c"]
     conn.close(); return {"reads": reads, "acks": acks}

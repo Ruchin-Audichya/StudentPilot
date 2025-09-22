@@ -34,7 +34,7 @@ from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Safe import for scraper (never break app startup on EB)
 try:
@@ -756,7 +756,7 @@ _user_events: List[Dict] = []  # in-memory only; rotate/limit
 @app.post("/api/log-user")
 def log_user(evt: UserLog):
     # Keep max 500 recent
-    _user_events.append({"t": datetime.utcnow().isoformat(), **evt.dict()})
+    _user_events.append({"t": datetime.now(timezone.utc).isoformat(), **evt.model_dump()})
     if len(_user_events) > 500:
         del _user_events[: len(_user_events) - 500]
     return {"ok": True, "count": len(_user_events)}
@@ -1194,7 +1194,7 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
                 "roles": set(extracted_roles) or set(),
                 "location": loc or None,
             },
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     return {
