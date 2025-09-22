@@ -19,7 +19,12 @@ try:
 except Exception:
     fitz = None  # type: ignore
     _PDF_ENABLED = False
-import docx
+try:
+    import docx  # type: ignore
+    _DOCX_ENABLED = True
+except Exception:
+    docx = None  # type: ignore
+    _DOCX_ENABLED = False
 from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile
 from fastapi import HTTPException
@@ -28,7 +33,7 @@ from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Safe import for scraper (never break app startup on EB)
 try:
@@ -253,6 +258,22 @@ if os.getenv("DEBUG_LOG", "0") in {"1","true","yes"}:
 def health_check():
     """Fast health endpoint (no scraping, disk, or network) for EB / load balancers."""
     return {"status": "ok"}
+
+# Robust preflight handler to avoid 400s from strict middleware validation on some clients
+@app.options("/{rest_of_path:path}")
+def any_options(request: Request):
+    origin = request.headers.get("origin") or "*"
+    acrm = request.headers.get("access-control-request-method") or "*"
+    acrh = request.headers.get("access-control-request-headers") or "*"
+    # If explicit CORS_ORIGINS configured, prefer reflecting the incoming origin only when present
+    allow_origin = origin if _cors_env else "*"
+    headers = {
+        "Access-Control-Allow-Origin": allow_origin,
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": acrh,
+        "Access-Control-Max-Age": "600",
+    }
+    return Response(status_code=204, headers=headers)
 
 @app.get("/version")
 def version_info():
@@ -740,7 +761,7 @@ _user_events: List[Dict] = []  # in-memory only; rotate/limit
 @app.post("/api/log-user")
 def log_user(evt: UserLog):
     # Keep max 500 recent
-    _user_events.append({"t": datetime.utcnow().isoformat(), **evt.dict()})
+    _user_events.append({"t": datetime.now(timezone.utc).isoformat(), **evt.model_dump()})
     if len(_user_events) > 500:
         del _user_events[: len(_user_events) - 500]
     return {"ok": True, "count": len(_user_events)}
@@ -1123,8 +1144,10 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
         except Exception as e:
             return {"error": f"Failed to parse PDF: {e}"}
     elif fname.endswith(".docx"):
+        if not _DOCX_ENABLED:
+            return {"error": "DOCX parsing requires python-docx (install with: pip install python-docx)."}
         try:
-            document = docx.Document(io.BytesIO(content))
+            document = docx.Document(io.BytesIO(content))  # type: ignore
             text = "\n".join(p.text for p in document.paragraphs)
         except Exception as e:
             return {"error": f"Failed to parse DOCX: {e}"}
@@ -1176,7 +1199,7 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
                 "roles": set(extracted_roles) or set(),
                 "location": loc or None,
             },
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     return {
