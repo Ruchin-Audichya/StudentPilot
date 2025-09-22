@@ -19,7 +19,13 @@ try:
 except Exception:
     fitz = None  # type: ignore
     _PDF_ENABLED = False
-import docx
+# Optional DOCX parsing dependency (python-docx)
+try:
+    import docx  # type: ignore
+    _DOCX_ENABLED = True
+except Exception:
+    docx = None  # type: ignore
+    _DOCX_ENABLED = False
 from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile
 from fastapi import HTTPException
@@ -1133,8 +1139,10 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
         except Exception as e:
             return {"error": f"Failed to parse PDF: {e}"}
     elif fname.endswith(".docx"):
+        if not _DOCX_ENABLED:
+            return {"error": "DOCX parsing requires python-docx (install with: pip install python-docx)."}
         try:
-            document = docx.Document(io.BytesIO(content))
+            document = docx.Document(io.BytesIO(content))  # type: ignore
             text = "\n".join(p.text for p in document.paragraphs)
         except Exception as e:
             return {"error": f"Failed to parse DOCX: {e}"}
