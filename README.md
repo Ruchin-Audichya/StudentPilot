@@ -15,7 +15,8 @@
   <img src="./public/placeholder.svg" alt="Hero" width="720" />
 </div>
 
----
+![Campus Connect Hero](assets/campus-connect-hero.png)
+
 
 This repository contains the working prototype of Find My Stipend (FMS), prepared for Smart India Hackathon. It blends multi‑source internship discovery with resume‑aware ranking, an AI resume analyzer, one‑click portfolio generation, and recruiter‑connect tooling. We also include a placement‑cell workflow (postings, approvals, interviews, dashboard) to support campus processes.
 
