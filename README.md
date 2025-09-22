@@ -41,11 +41,11 @@ These are used in the landing page carousel (place files under `public/posters/`
 
 <div align="center">
 
-<img src="public/posters/campus-connect-hero.png" alt="Campus Connect" width="420"/>
+<img src="public/posters/Poster 1.png" alt="Poster 1" width="420"/>
 
-<img src="public/posters/one-portal-two-wins.png" alt="One portal, two wins" width="420"/>
+<img src="public/posters/Poster 2.png" alt="Poster 2" width="420"/>
 
-<img src="public/posters/find-your-dream-internship.png" alt="Find your dream internship" width="420"/>
+<img src="public/posters/Poster 3.png" alt="Poster 3" width="420"/>
 
 </div>
 

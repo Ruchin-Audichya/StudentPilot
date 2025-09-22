@@ -151,9 +151,9 @@ export default function Landing() {
         <HeroCarousel
           className="mx-auto max-w-5xl"
           slides={[
-            { src: "/posters/campus-connect-hero.png", alt: "Campus Connect hero", caption: "Campus — Targeted notices & real-time updates" },
-            { src: "/posters/one-portal-two-wins.png", alt: "One portal, two wins", caption: "Students & Admins — one place for everything" },
-            { src: "/posters/find-your-dream-internship.png", alt: "Find your dream internship", caption: "Resume-aware internships & AI prep" },
+            { src: "/posters/Poster 1.png", alt: "Poster 1", caption: "Campus — Targeted notices & real-time updates" },
+            { src: "/posters/Poster 2.png", alt: "Poster 2", caption: "Students & Admins — one place for everything" },
+            { src: "/posters/Poster 3.png", alt: "Poster 3", caption: "Resume-aware internships & AI prep" },
           ]}
         />
 
