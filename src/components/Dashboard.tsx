@@ -15,6 +15,7 @@ import BackendDebug from "@/components/BackendDebug";
 import "../App.css";
 import FilterBox from "@/components/FilterBox";
 import TopNav from "@/components/TopNav";
+import { buildSessionHeaders, fetchWithTimeout, readJsonSafe } from "@/lib/http";
 
 interface StudentProfile {
   name: string;
@@ -268,12 +269,12 @@ export default function Dashboard({ profile }: DashboardProps) {
     try {
       const formData = new FormData();
       formData.append("file", resumeFile);
-      const res = await fetch(`${API_BASE}/api/upload-resume`, {
+      const res = await fetchWithTimeout(`${API_BASE}/api/upload-resume`, {
         method: "POST",
         body: formData,
-        headers: sessionIdRef.current ? { "X-Session-Id": sessionIdRef.current } : undefined,
-      });
-      const data = await res.json();
+        headers: buildSessionHeaders(),
+      }, 20000);
+      const data = await readJsonSafe(res);
       console.log("Resume upload:", data);
       if (res.ok) setUploaded(true);
       // If we already have results, analyze them now
@@ -303,19 +304,18 @@ export default function Dashboard({ profile }: DashboardProps) {
     setChatLoading(true);
 
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (sessionIdRef.current) headers["X-Session-Id"] = sessionIdRef.current;
+      const headers: Record<string, string> = buildSessionHeaders({ "Content-Type": "application/json" });
       try {
         const token = await auth.currentUser?.getIdToken();
         if (token) headers["id_token"] = token;
       } catch {}
 
-      const res = await fetch(`${API_BASE}/api/chat`, {
+      const res = await fetchWithTimeout(`${API_BASE}/api/chat`, {
         method: "POST",
         headers,
-  body: JSON.stringify({ message: userMsg.text, session_id: sessionIdRef.current || undefined }),
-      });
-      const data = await res.json();
+        body: JSON.stringify({ message: userMsg.text, session_id: sessionIdRef.current || undefined }),
+      }, 18000);
+      const data = await readJsonSafe(res);
       const botMsg = { role: "bot", text: data.response || "No response" };
       setChatMessages((prev) => [...prev, botMsg]);
     } catch (err) {

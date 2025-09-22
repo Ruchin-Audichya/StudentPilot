@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { FIREBASE_READY, uploadToStorage } from "@/lib/firebase";
 import { API_BASE } from "@/lib/apiBase";
+import { buildSessionHeaders, fetchWithTimeout, readJsonSafe } from "@/lib/http";
 
 type Props = {
   onUploaded: (result: { status?: string; chars?: number; preview?: string; url?: string }) => void;
@@ -25,13 +26,12 @@ export default function ResumeUploader({ onUploaded }: Props) {
 
     const form = new FormData();
     form.append("file", file);
-  const sid = (()=>{ try{ return localStorage.getItem('wm.session.v1') || (localStorage.setItem('wm.session.v1', crypto.randomUUID()), localStorage.getItem('wm.session.v1')); } catch { return null; } })();
-  const res = await fetch(API_BASE + "/api/upload-resume", {
+  const res = await fetchWithTimeout(API_BASE + "/api/upload-resume", {
       method: "POST",
       body: form,
-      headers: sid ? { 'X-Session-Id': sid } : undefined,
-    });
-    const data = await res.json();
+      headers: buildSessionHeaders(),
+    }, 20000);
+    const data = await readJsonSafe(res);
     setUploading(false);
     if (url) setUploaded(url);
     onUploaded({ ...data, url: url || undefined });
