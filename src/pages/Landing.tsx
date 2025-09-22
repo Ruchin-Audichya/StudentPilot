@@ -105,7 +105,7 @@ export default function Landing() {
         <p className="mt-3 sm:mt-4 text-gray-400 text-base sm:text-lg md:text-xl max-w-2xl mx-auto">
           AI that finds the right internship—so you don’t have to
         </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
+  <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.25 }} className="inline-block">
             <Link
               to="/auth"
@@ -120,6 +120,14 @@ export default function Landing() {
               className="px-5 py-3 rounded-full font-semibold text-sm sm:text-base border border-white/20 hover:bg-white/10"
             >
               Try Demo
+            </Link>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.25 }} className="inline-block">
+            <Link
+              to="/campus"
+              className="px-5 py-3 rounded-full font-semibold text-sm sm:text-base border border-white/20 hover:bg-white/10"
+            >
+              Campus Connect
             </Link>
           </motion.div>
         </div>

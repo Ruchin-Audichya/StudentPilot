@@ -1,0 +1,5 @@
+{
+  "admin_demo": { "role": "admin", "dept": "CSE", "year": 4 },
+  "student_demo": { "role": "student", "dept": "CSE", "year": 3 },
+  "mentor_demo": { "role": "mentor", "dept": "CSE", "year": 4 }
+}

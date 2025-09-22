@@ -12,11 +12,19 @@ import Logout from "./pages/Logout";
 import AuthPage from "@/pages/AuthPage"; // <-- Added
 import MobileTabBar from "@/components/MobileTabBar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import CampusFeed from "@/pages/campus/Feed.tsx";
+import AdminConsole from "@/pages/campus/AdminConsole.tsx";
+import PlacementPostings from "@/pages/placement/Postings";
+import AdminPostings from "@/pages/placement/AdminPostings";
+import NotificationCenter from "@/components/NotificationCenter";
+import CampusHub from "@/pages/campus/Hub";
+import GovSnapshot from "@/pages/campus/GovSnapshot";
 
 export default function App() {
   const isMobile = useIsMobile();
   return (
     <Router>
+      <NotificationCenter />
   <Routes>
         {/* Landing page */}
         <Route path="/" element={<>
@@ -53,6 +61,34 @@ export default function App() {
         {/* Main dashboard */}
         <Route path="/dashboard" element={<>
           <Dashboard />
+          {isMobile && <MobileTabBar />}
+        </>} />
+
+        {/* Campus Communication MVP */}
+        <Route path="/campus" element={<>
+          <CampusHub />
+          {isMobile && <MobileTabBar />}
+        </>} />
+        <Route path="/campus/gov" element={<>
+          <GovSnapshot />
+          {isMobile && <MobileTabBar />}
+        </>} />
+        <Route path="/feed" element={<>
+          <CampusFeed />
+          {isMobile && <MobileTabBar />}
+        </>} />
+        <Route path="/admin/console" element={<>
+          <AdminConsole />
+          {isMobile && <MobileTabBar />}
+        </>} />
+
+        {/* Placement Lite */}
+        <Route path="/placement" element={<>
+          <PlacementPostings />
+          {isMobile && <MobileTabBar />}
+        </>} />
+        <Route path="/admin/placements" element={<>
+          <AdminPostings />
           {isMobile && <MobileTabBar />}
         </>} />
 

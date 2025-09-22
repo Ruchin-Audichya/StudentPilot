@@ -7,6 +7,7 @@ export default function TopNav({ actions = [] as Action[] }) {
   const [open, setOpen] = useState(false);
   // Always add OppRadar to actions if not present
   const mergedActions = [
+    { label: "🏫 Campus Connect", to: "/campus" },
     ...actions,
     { label: "🛰️ Opportunity Radar", to: "/oppradar" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
@@ -44,6 +45,7 @@ export default function TopNav({ actions = [] as Action[] }) {
       {open && (
         <div className="sm:hidden px-3 pb-3">
           <div className="rounded-2xl border border-white/10 bg-black/80 backdrop-blur p-2 grid grid-cols-2 gap-2">
+            <Link to="/campus" className="wm-pill px-3 py-2 text-sm text-left">🏫 Campus Connect</Link>
             <Link to="/mock-interview" className="wm-pill px-3 py-2 text-sm text-left">🎙️ Mock Interview</Link>
             <Link to="/resume-genius" className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</Link>
             <Link to="/dashboard" className="wm-pill px-3 py-2 text-sm text-left">📅 Dashboard</Link>

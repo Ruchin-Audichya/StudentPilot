@@ -206,6 +206,21 @@ try:
     app.include_router(mock_interview_router)
 except Exception:
     pass
+try:
+    from routes.campus import router as campus_router  # type: ignore
+    app.include_router(campus_router)
+except Exception:
+    pass
+try:
+    from routes.placement import router as placement_router  # type: ignore
+    app.include_router(placement_router)
+except Exception:
+    pass
+try:
+    from routes.gov_feeds import router as gov_feeds_router  # type: ignore
+    app.include_router(gov_feeds_router)
+except Exception:
+    pass
 # CORS: default to permissive for public API usage; can be restricted via env if needed.
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 if _cors_env:
