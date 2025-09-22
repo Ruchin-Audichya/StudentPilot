@@ -19,13 +19,7 @@ try:
 except Exception:
     fitz = None  # type: ignore
     _PDF_ENABLED = False
-# Optional DOCX parsing dependency (python-docx)
-try:
-    import docx  # type: ignore
-    _DOCX_ENABLED = True
-except Exception:
-    docx = None  # type: ignore
-    _DOCX_ENABLED = False
+import docx
 from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile
 from fastapi import HTTPException
@@ -34,7 +28,7 @@ from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from pydantic import BaseModel
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 # Safe import for scraper (never break app startup on EB)
 try:
@@ -153,7 +147,7 @@ def _openrouter_config():
     site_url = (
         os.getenv("OPENROUTER_SITE_URL", "").strip()
         or os.getenv("FRONTEND_ORIGIN", "").strip()
-        or "https://findmystipend.onrender.com"
+    or "https://studentpilot.onrender.com"
     )
     site_name = os.getenv("OPENROUTER_SITE_NAME", "Find My Stipend").strip() or "Find My Stipend"
     return key, models, base, site_url, site_name
@@ -203,6 +197,11 @@ try:
 except Exception:
     pass
 try:
+    from routes.gov_feeds import router as gov_feeds_router  # type: ignore
+    app.include_router(gov_feeds_router)
+except Exception:
+    pass
+try:
     from routes.testimonials import router as testimonials_router  # type: ignore
     app.include_router(testimonials_router)
 except Exception:
@@ -210,21 +209,6 @@ except Exception:
 try:
     from routes.mock_interview import router as mock_interview_router  # type: ignore
     app.include_router(mock_interview_router)
-except Exception:
-    pass
-try:
-    from routes.campus import router as campus_router  # type: ignore
-    app.include_router(campus_router)
-except Exception:
-    pass
-try:
-    from routes.placement import router as placement_router  # type: ignore
-    app.include_router(placement_router)
-except Exception:
-    pass
-try:
-    from routes.gov_feeds import router as gov_feeds_router  # type: ignore
-    app.include_router(gov_feeds_router)
 except Exception:
     pass
 # CORS: default to permissive for public API usage; can be restricted via env if needed.
@@ -756,7 +740,7 @@ _user_events: List[Dict] = []  # in-memory only; rotate/limit
 @app.post("/api/log-user")
 def log_user(evt: UserLog):
     # Keep max 500 recent
-    _user_events.append({"t": datetime.now(timezone.utc).isoformat(), **evt.model_dump()})
+    _user_events.append({"t": datetime.utcnow().isoformat(), **evt.dict()})
     if len(_user_events) > 500:
         del _user_events[: len(_user_events) - 500]
     return {"ok": True, "count": len(_user_events)}
@@ -1139,10 +1123,8 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
         except Exception as e:
             return {"error": f"Failed to parse PDF: {e}"}
     elif fname.endswith(".docx"):
-        if not _DOCX_ENABLED:
-            return {"error": "DOCX parsing requires python-docx (install with: pip install python-docx)."}
         try:
-            document = docx.Document(io.BytesIO(content))  # type: ignore
+            document = docx.Document(io.BytesIO(content))
             text = "\n".join(p.text for p in document.paragraphs)
         except Exception as e:
             return {"error": f"Failed to parse DOCX: {e}"}
@@ -1194,7 +1176,7 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
                 "roles": set(extracted_roles) or set(),
                 "location": loc or None,
             },
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
         }
 
     return {
