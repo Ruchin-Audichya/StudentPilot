@@ -452,7 +452,9 @@ def _dedupe(jobs: List[Dict]) -> List[Dict]:
     seen = set()
     out = []
     for job in jobs:
-        key = (job.get("apply_url") or "").split("?")[0].lower()
+        key = (job.get("apply_url") or "").split("?")[0].rstrip('/').lower()
+        if not key:
+            key = '|'.join(str(job.get(field) or '').strip().lower() for field in ('title', 'company', 'location'))
         if key in seen:
             continue
         seen.add(key)
@@ -858,41 +860,44 @@ def search_internships(req: SearchRequest, request: Request):
     location = loc_from_filters or active_profile.get("location") or loc_fallback
 
     # Blended queries: user + resume + buzzword roles + fallback + tech-enhanced queries
-    queries = set()
+    queries = []
+    def add_query(value: str):
+        if value and value not in queries:
+            queries.append(value)
     if user_q:
-        queries.add(user_q)
+        add_query(user_q)
         # Add tech-enhanced version of user query
         tech_enhanced = _enhance_user_query_for_tech(user_q)
         if tech_enhanced != user_q:
-            queries.add(tech_enhanced)
+            add_query(tech_enhanced)
     
     if active_profile["roles"]:
         for role in list(active_profile["roles"])[:2]:
-            queries.add(f"{role} internship")
+            add_query(f"{role} internship")
     if active_profile["skills"]:
         # Create skill-based queries with tech focus
         top_skills = list(active_profile["skills"])[:3]
         skill_query = " ".join(top_skills) + " internship"
-        queries.add(skill_query)
+        add_query(skill_query)
         # Add individual high-value skill queries
         high_value_skills = ["python", "java", "javascript", "react", "machine learning", "data science"]
         for skill in active_profile["skills"]:
             if skill.lower() in high_value_skills:
-                queries.add(f"{skill} developer internship")
+                add_query(f"{skill} developer internship")
     
     # Add buzzword role queries (limit to most relevant)
     tech_focused_roles = ["software engineer", "web developer", "data scientist", "mobile developer"]
     for role in list(buzzword_roles)[:3]:  # reduced from 5 to focus on quality
         if any(tech_role in role for tech_role in tech_focused_roles):
-            queries.add(f"{role} internship")
+            add_query(f"{role} internship")
     
     # Add default tech queries if no specific tech skills found
     if not any(skill in str(active_profile.get("skills", [])).lower() 
               for skill in ["python", "java", "javascript", "react", "data"]):
-        queries.add("software engineer internship")
-        queries.add("web developer internship")
+        add_query("software engineer internship")
+        add_query("web developer internship")
     
-    queries.add("internship")  # fallback
+    add_query("internship")  # fallback
 
     # Run scrapers in parallel with a short time budget for responsiveness
     all_jobs = []
@@ -939,8 +944,6 @@ def search_internships(req: SearchRequest, request: Request):
                     all_jobs.extend(jobs)
                     if debug_scrapers:
                         print(f"[scrape] got {len(jobs)} jobs (total {len(all_jobs)})")
-                if len(all_jobs) >= 60:
-                    break
             except Exception:
                 if debug_scrapers:
                     import traceback
@@ -960,7 +963,7 @@ def search_internships(req: SearchRequest, request: Request):
             # Python <3.9 fallback
             executor.shutdown(wait=False)
 
-    if not all_jobs and os.getenv("ALLOW_SAMPLE_FALLBACK", "1") in {"1","true","yes","on"}:
+    if not all_jobs and os.getenv("ALLOW_SAMPLE_FALLBACK", "0") in {"1","true","yes","on"}:
         # Fallback: return synthetic sample results so UI still functions
         if debug_scrapers:
             print("[scrape] no real jobs fetched, returning fallback samples")
@@ -997,19 +1000,11 @@ def search_internships(req: SearchRequest, request: Request):
     for job in all_jobs:
         by_source[job.get("source", "other").lower()].append(job)
 
-    # Normalize scores per source
-    for src, jobs in by_source.items():
-        if not jobs:
-            continue
-        max_s = max(j["score"] for j in jobs) or 1
-        for j in jobs:
-            j["score"] = round((j["score"] / max_s) * 100, 2)
-
     # Sort inside each source
     for src in by_source:
         by_source[src].sort(key=lambda x: x["score"], reverse=True)
 
-    # Balanced interleave: at least 40% from each if available. Cap total with env.
+    # Interleave sources so one scraper cannot dominate the first page.
     final_cap = int(os.getenv("SEARCH_MAX_RESULTS", "80"))
     final_jobs = []
     src_names = list(by_source.keys())
@@ -1017,17 +1012,6 @@ def search_internships(req: SearchRequest, request: Request):
         for src in src_names:
             if by_source[src]:
                 final_jobs.append(by_source[src].pop(0))
-
-    # Limit duplicate roles in top results (gentle)
-    dup_threshold = int(os.getenv("DUPLICATE_ROLE_LIMIT_N", "30"))
-    seen_roles = set()
-    diverse_jobs = []
-    for job in final_jobs:
-        role_key = job["title"].split()[0].lower()
-        if role_key in seen_roles and len(diverse_jobs) < dup_threshold:
-            continue
-        seen_roles.add(role_key)
-        diverse_jobs.append(job)
 
     return [
         Internship(
@@ -1042,7 +1026,7 @@ def search_internships(req: SearchRequest, request: Request):
             score=job.get("score"),
             is_new=job.get("is_new"),
         )
-        for job in diverse_jobs
+        for job in final_jobs
     ]
 
 # -----------------------------

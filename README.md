@@ -26,6 +26,8 @@
 
 Find My Stipend blends multiple job sources (Internshala, LinkedIn, ATS company careers) with resume‑aware ranking, an AI portfolio generator (Gemini full‑site or fast template), and HR tools that surface real recruiter profiles — deployed on Render + Vercel.
 
+The new internship search and application workspace is documented in [docs/job-automation.md](docs/job-automation.md). It adds 12 board searches, local browser sign-in and form filling, PDF-to-LaTeX tailoring, reviewed application queues and CSV tracking. The visible browser service runs locally; the existing Render deployment does not run it.
+
 ## Table of Contents
 - [Features](#features)
 - [Demo Shots](#demo-shots)

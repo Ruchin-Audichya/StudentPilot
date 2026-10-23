@@ -1,17 +1,18 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // Pages & Components
-import Landing from "@/pages/Landing";
+import Landing from "@/pages/LandingFocused";
 import MockInterview from '@/pages/MockInterview'; 
 import ResumeGenius from '@/pages/ResumeGenius';
 import Chat from '@/pages/Chat';
 import OppRadar from '@/pages/OppRadar';
 import GovSnapshot from '@/pages/GovSnapshot';
 import Onboarding from "@/components/Onboarding";
-import Dashboard from "@/components/Dashboard";
+import Dashboard from "@/components/FocusedDashboard";
 import Logout from "./pages/Logout";
 import AuthPage from "@/pages/AuthPage"; // <-- Added
 import MobileTabBar from "@/components/MobileTabBar";
+import JobSearch from "@/pages/JobSearch";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
   return (
     <Router>
   <Routes>
+        <Route path="/jobs" element={<><JobSearch />{isMobile && <MobileTabBar />}</>} />
         {/* Landing page */}
         <Route path="/" element={<>
           <Landing />
