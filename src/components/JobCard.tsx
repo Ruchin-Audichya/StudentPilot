@@ -2,6 +2,7 @@ import { memo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { JobResult } from "@/services/jobApi";
+import { Link } from "react-router-dom";
 
 type Props = { job: JobResult };
 
@@ -15,8 +16,8 @@ function tagColor(tag: string) {
 }
 
 export default memo(function JobCard({ job }: Props) {
-  const hot = Array.isArray((job as any).tags)
-    ? ((job as any).tags as string[]).some((t) => (t || "").toLowerCase().includes("🔥 hot"))
+  const hot = Array.isArray(job.tags)
+    ? job.tags.some((t) => (t || "").toLowerCase().includes("🔥 hot"))
     : Array.isArray(job.required_skills)
       ? job.required_skills.some((t) => (t || "").toLowerCase().includes("🔥 hot"))
       : false;
@@ -28,8 +29,9 @@ export default memo(function JobCard({ job }: Props) {
   if (hay.includes("hybrid")) tagList.push("hybrid");
   if (hay.includes("onsite") || hay.includes("on-site")) tagList.push("onsite");
 
-  const applyHref = (job.url || (job as any).apply_url || (job as any).applyUrl || "").toString();
-  const missing: string[] | undefined = (job as any).missing_keywords;
+  const applyHref = job.url || '';
+  const queueHref = `/jobs?${new URLSearchParams({ url: applyHref, title: job.title, company: job.company })}`;
+  const missing = job.missing_keywords;
 
   return (
     <motion.div
@@ -66,7 +68,7 @@ export default memo(function JobCard({ job }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {(job as any).verified && (
+          {job.verified && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1" title="Verified source">
               <span role="img" aria-hidden>✅</span>
               <span>Verified</span>
@@ -149,7 +151,7 @@ export default memo(function JobCard({ job }: Props) {
 
       <div className="mt-auto pt-4 flex items-center justify-between gap-2 flex-wrap">
         <Button asChild className="gradient-primary text-white w-full sm:w-auto">
-          <a href={applyHref || "#"} target="_blank" rel="noopener noreferrer">Apply Now</a>
+          <Link to={queueHref} onClick={() => sessionStorage.setItem('studentpilot.selectedJob', JSON.stringify(job))}>Tailor &amp; apply</Link>
         </Button>
         <button
           onClick={() => applyHref && window.open(applyHref, "_blank")}

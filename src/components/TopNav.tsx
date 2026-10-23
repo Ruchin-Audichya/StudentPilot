@@ -6,17 +6,16 @@ type Action = { label: string; to: string; newTab?: boolean };
 export default function TopNav({ actions = [] as Action[] }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
-  // Always add OppRadar to actions if not present
   const mergedActions = [
     ...actions,
-    { label: "🛰️ Opportunity Radar", to: "/oppradar" },
-    { label: "🏛️ Gov Snapshot", to: "/gov-snapshot" },
+    { label: "💼 Jobs & Applications", to: "/jobs" },
+    { label: "Search internships", to: "/dashboard" },
   ].filter((a, i, arr) => arr.findIndex(x => x.to === a.to) === i);
   return (
   <nav className="sticky top-0 z-30 w-full bg-black/60 backdrop-blur border-b border-white/10 text-white safe-top">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
         <Link to="/" className="text-base sm:text-lg font-bold tracking-tight">
-          Find My Stipend<span className="align-super">®</span>
+          StudentPilot
         </Link>
         {/* Right cluster: desktop (actions + logout) */}
         <div className="hidden sm:flex items-center gap-2 ml-auto">
@@ -59,11 +58,9 @@ export default function TopNav({ actions = [] as Action[] }) {
       {open && (
         <div className="sm:hidden px-3 pb-3">
           <div className="rounded-2xl border border-white/10 bg-black/80 backdrop-blur p-2 grid grid-cols-2 gap-2">
-            <Link to="/mock-interview" className="wm-pill px-3 py-2 text-sm text-left">🎙️ Mock Interview</Link>
-            <Link to="/resume-genius" className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</Link>
             <Link to="/dashboard" className="wm-pill px-3 py-2 text-sm text-left">📅 Dashboard</Link>
-            <Link to="/oppradar" className="wm-pill px-3 py-2 text-sm text-left">🛰️ Opportunity Radar</Link>
-            <Link to="/gov-snapshot" className="wm-pill px-3 py-2 text-sm text-left">🏛️ Gov Snapshot</Link>
+            <Link to="/jobs" className="wm-pill px-3 py-2 text-sm text-left">💼 Jobs & Applications</Link>
+            <Link to="/resume-genius" className="wm-pill px-3 py-2 text-sm text-left">🧠 Resume Genius</Link>
             <Link to="/logout" className="wm-pill px-3 py-2 text-sm text-left">🚪 Logout</Link>
           </div>
         </div>

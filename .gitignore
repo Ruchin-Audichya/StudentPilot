@@ -1,5 +1,6 @@
 # Local env files
 .env
+.studentpilot/
 backend/.env
 .env.local
 .env.development.local

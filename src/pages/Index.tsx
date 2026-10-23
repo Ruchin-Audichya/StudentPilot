@@ -2,7 +2,7 @@
 // If you want to restore the previous behavior, import this in App.tsx.
 import { useState } from 'react';
 import Onboarding from '@/components/Onboarding';
-import Dashboard from '@/components/Dashboard';
+import Dashboard from '@/components/FocusedDashboard';
 
 interface StudentProfile {
   name: string;
