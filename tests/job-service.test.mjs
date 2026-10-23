@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createApp } from '../server/app.mjs';
 import { looksLikeJobDetail, searchJobs } from '../server/search.mjs';
-import { canApply } from '../server/store.mjs';
+import { canApply, Store } from '../server/store.mjs';
 import { answerFor } from '../server/apply.mjs';
-import { fillApplication, receiptOn } from '../server/apply.mjs';
+import { fillApplication, receiptOn, receiptOnPages } from '../server/apply.mjs';
 import { validateLatex } from '../server/tailor.mjs';
 import { chromium } from 'playwright';
 import { writeFile } from 'node:fs/promises';
@@ -97,6 +97,11 @@ test('API requires review and never retries an uncertain submission', async () =
     assert.equal(attempts, 1);
     state = await (await call(`/${job.id}/receipt`, { manualReceipt: 'Confirmation 123' })).json();
     assert.equal(state.applications[0].status, 'submitted_manually');
+    state.applications[0].status = 'submitting';
+    await new Store(directory).write('local-user', state);
+    state = await (await call('/state')).json();
+    assert.equal(state.applications[0].status, 'submission_unknown');
+    assert.equal((await new Store(directory).read('local-user')).applications[0].status, 'submission_unknown', 'restart recovery is durable');
   } finally {
     server.close(); await rm(directory, { recursive: true, force: true });
   }
@@ -124,8 +129,10 @@ test('browser fills known fields and pauses on unanswered requirements', async (
     assert.deepEqual(second.unanswered, []);
     assert.equal(await page.locator('select').inputValue(), 'Yes');
     assert.equal(await receiptOn(page), null);
-    await page.setContent('<h1>Your application has been submitted.</h1>');
-    assert.match((await receiptOn(page)).text, /submitted/);
+    const confirmation = await browser.newPage();
+    await confirmation.setContent('<h1>Your application has been submitted.</h1>');
+    assert.match((await receiptOnPages(new Set([page, confirmation]))).text, /submitted/);
+    assert.equal(await receiptOnPages(new Set([page])), null, 'unrelated tabs must not supply a receipt');
   } finally { await browser.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -174,5 +181,13 @@ test('reviewed queue stops at the first form needing input', async () => {
     assert.equal(state.lastRun.stoppedAt, job.id);
     assert.equal(state.applications.find(item => item.jobId === job.id).status, 'needs_input');
     assert.equal(state.applications.find(item => item.jobId === second.id).status, 'ready');
+    state = await call('/profile', { fullName: 'A B', firstName: 'A', lastName: 'B', email: 'a@example.com',
+      phone: '', linkedin: '', portfolio: '', role: 'Engineer', location: 'India', facts: 'Updated experience', answers: {} });
+    assert.equal(state.applications.length, 0, 'old tailored applications must be removed when confirmed facts change');
+    state = await call('/queue/prepare', { jobIds: [job.id] });
+    assert.equal(state.applications[0].status, 'needs_review', 'the queue can regenerate after a profile change');
+    const replacement = new FormData(); replacement.append('resume', new Blob([Buffer.from('%PDF-new')]), 'updated.pdf');
+    state = await call('/resume', replacement);
+    assert.equal(state.applications.length, 0, 'a new resume invalidates old tailored applications');
   } finally { server.close(); await rm(directory, { recursive: true, force: true }); }
 });

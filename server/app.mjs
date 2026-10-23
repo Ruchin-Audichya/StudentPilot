@@ -102,16 +102,24 @@ export function createApp(config, overrides = {}) {
   app.get('/api/jobs/state', async (req, res) => {
     const state = await store.read(req.userId);
     // A process restart during submission has an unknown outcome, never a retryable one.
+    let recovered = false;
     for (const a of state.applications) if (a.status === 'submitting' && !busy.has(req.userId)) {
       a.status = 'submission_unknown'; a.message = 'The service restarted during submission. Check the employer receipt; automatic retry is disabled.';
+      recovered = true;
     }
+    if (recovered) await store.write(req.userId, state);
     res.json(state);
   });
   app.post('/api/jobs/profile', mutation(async (req, res) => {
     const profile = profileSchema.parse(req.body);
     const state = await store.read(req.userId);
+    const changed = digest(JSON.stringify(state.profile)) !== digest(JSON.stringify(profile));
     state.profile = profile;
-    for (const a of state.applications) if (canTailor(a)) { a.reviewedHash = null; a.status = 'needs_review'; }
+    if (changed) {
+      const previousCount = state.applications.length;
+      state.applications = state.applications.filter(a => !canTailor(a));
+      if (state.applications.length !== previousCount) await runner.close(req.userId).catch(() => {});
+    }
     await store.write(req.userId, state); res.json(state);
   }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5_000_000, files: 1, fields: 0 } }).single('resume');
@@ -120,9 +128,14 @@ export function createApp(config, overrides = {}) {
       throw errorWithStatus('Upload a PDF resume, up to 5 MB.');
     }
     const state = await store.read(req.userId);
+    const changed = state.resume?.hash !== digest(req.file.buffer);
     await store.file(req.userId, 'original.pdf', req.file.buffer);
     state.resume = { name: req.file.originalname.slice(0, 200), hash: digest(req.file.buffer), uploadedAt: new Date().toISOString() };
-    for (const a of state.applications) if (canTailor(a)) { a.reviewedHash = null; a.status = 'needs_review'; }
+    if (changed) {
+      const previousCount = state.applications.length;
+      state.applications = state.applications.filter(a => !canTailor(a));
+      if (state.applications.length !== previousCount) await runner.close(req.userId).catch(() => {});
+    }
     await store.write(req.userId, state); res.json(state);
   }));
   app.post('/api/jobs/search', mutation(async (req, res) => {
@@ -133,7 +146,8 @@ export function createApp(config, overrides = {}) {
     const jobs = new Map(state.jobs.map(job => [job.id, job]));
     for (const job of result.jobs) jobs.set(job.id, job);
     state.jobs = [...jobs.values()]; state.coverage = result.coverage;
-    await store.write(req.userId, state); res.json({ ...state, searchJobIds: result.jobs.map(job => job.id) });
+    state.searchJobIds = result.jobs.map(job => job.id);
+    await store.write(req.userId, state); res.json(state);
   }));
   app.post('/api/jobs/connections/:source', mutation(async (req, res) => {
     if (!config.enableBrowser) throw errorWithStatus('Start the local job service with ENABLE_APPLICATION_BROWSER=true.', 503);
@@ -186,6 +200,7 @@ export function createApp(config, overrides = {}) {
   app.post('/api/jobs/:id/compile', mutation(async (req, res) => {
     const state = await store.read(req.userId);
     const application = applicationFor(state, req.params.id);
+    assertFresh(state, application);
     if (!canTailor(application)) throw errorWithStatus('Submitted materials are locked.', 409);
     const latex = z.string().min(100).max(100_000).parse(req.body.latex);
     // Invalidate approval even if recompilation fails; an old PDF cannot be submitted.

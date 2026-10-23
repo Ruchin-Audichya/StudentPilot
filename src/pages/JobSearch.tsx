@@ -75,6 +75,7 @@ export default function JobSearch() {
   const [manualReceipt, setManualReceipt] = useState('');
   const [searchText, setSearchText] = useState('');
   const [queueMessage, setQueueMessage] = useState('');
+  const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
 
   const refresh = async () => {
     const next = await jobRequest<JobState>('/state');
@@ -99,6 +100,10 @@ export default function JobSearch() {
     setBusy(key); setError('');
     try {
       const next = await action(); setState(next);
+      if (key === 'import') {
+        const imported = next.jobs.at(-1);
+        if (imported) { setSelectedId(imported.id); setLatex(''); }
+      }
       if (key === 'tailor' || key === 'compile') {
         const id = selectedId;
         if (id) {
@@ -113,6 +118,8 @@ export default function JobSearch() {
   };
   const selectedJob = state?.jobs.find(j => j.id === selectedId);
   const selectedApplication = state?.applications.find(a => a.jobId === selectedId);
+  const profileSaved = Boolean(state && Object.keys(state.profile).length &&
+    Object.entries(profile).every(([key, value]) => JSON.stringify(value) === JSON.stringify(state.profile[key])));
   const filteredJobs = useMemo(() => (state?.jobs || []).filter(job =>
     `${job.title} ${job.company} ${job.source}`.toLowerCase().includes(searchText.toLowerCase())), [state?.jobs, searchText]);
   const selectJob = async (job: Job) => {
@@ -143,13 +150,17 @@ export default function JobSearch() {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
   const prepareQueue = () => {
-    const ids = (state?.jobs || []).filter(job => !state?.applications.some(a => a.jobId === job.id)).slice(0, 10).map(job => job.id);
-    if (!ids.length) return setQueueMessage('Find or import jobs before preparing resumes.');
+    const recentIds = state?.searchJobIds || [];
+    const importedIds = (state?.jobs || []).filter(job => job.source === 'Imported by you' || job.source === 'Company / imported URL').map(job => job.id).reverse();
+    const queueIds = selectedJobIds.length ? selectedJobIds : [...new Set([...recentIds, ...importedIds])];
+    const candidates = queueIds.map(id => state?.jobs.find(job => job.id === id)).filter((job): job is Job => Boolean(job));
+    const ids = candidates.filter(job => !state?.applications.some(a => a.jobId === job.id)).slice(0, 10).map(job => job.id);
+    if (!ids.length) return setQueueMessage('Select unprepared jobs in the queue, or search or import new jobs.');
     setQueueMessage('Preparing resumes one by one. Review each PDF before applying.');
     run('prepare', () => jobPost('/queue/prepare', { jobIds: ids }));
   };
   const runReviewed = () => {
-    const ids = (state?.applications || []).filter(a => a.status === 'ready').slice(0, 10).map(a => a.jobId);
+    const ids = (state?.applications || []).filter(a => a.status === 'ready' && (!selectedJobIds.length || selectedJobIds.includes(a.jobId))).slice(0, 10).map(a => a.jobId);
     if (!ids.length) return setQueueMessage('Review and approve at least one tailored PDF first.');
     setQueueMessage('Submitting reviewed applications one by one. The run pauses if a form needs you.');
     run('run-reviewed', () => jobPost('/run-reviewed', { jobIds: ids }));
@@ -204,6 +215,7 @@ export default function JobSearch() {
           </div>
           <div className="flex flex-wrap gap-3 items-center">
             <Button disabled={Boolean(busy)} onClick={() => run('profile', () => jobPost('/profile', profile))}>Save details</Button>
+            {!profileSaved && <span className="text-sm text-amber-500">Save details before preparing or applying.</span>}
             <label className="inline-flex items-center gap-2 cursor-pointer rounded-md border px-3 py-2 text-sm"><Upload className="h-4 w-4" />Upload PDF resume
               <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={e => {
                 const file = e.target.files?.[0]; if (!file) return;
@@ -229,25 +241,25 @@ export default function JobSearch() {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
         <Card className="lg:col-span-2"><CardHeader><CardTitle>3. Start automation</CardTitle><CardDescription>Prepare up to 10 jobs, check each tailored PDF, then submit approved applications one at a time. The run stops when a site asks for sign-in, a CAPTCHA, an unknown answer, or a manual step.</CardDescription></CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-3"><Button disabled={Boolean(busy) || !state?.resume || !state.jobs.length} onClick={prepareQueue}>Prepare resume queue</Button>
-            <Button disabled={Boolean(busy) || !(state?.applications.some(a => a.status === 'ready')) || !health?.browser} onClick={runReviewed}>Start auto-apply for reviewed jobs</Button>
+          <CardContent className="flex flex-wrap items-center gap-3"><Button disabled={Boolean(busy) || !profileSaved || !state?.resume || !state.jobs.length} onClick={prepareQueue}>Prepare resume queue</Button>
+            <Button disabled={Boolean(busy) || !profileSaved || !(state?.applications.some(a => a.status === 'ready' && (!selectedJobIds.length || selectedJobIds.includes(a.jobId)))) || !health?.browser} onClick={runReviewed}>Start auto-apply for reviewed jobs</Button>
             <Button variant="outline" disabled={!state?.jobs.length} onClick={exportApplications}>Export tracker CSV</Button>
             <Button variant="ghost" disabled={Boolean(busy) || !health.browser} onClick={async () => { try { await jobRequest('/browser/close', { method: 'POST' }); toast.success('Application browser closed'); } catch (cause) { toast.error((cause as Error).message); } }}>Close application browser</Button>
             {(queueMessage || state?.lastRun) && <p className="w-full text-sm text-muted-foreground">{state?.lastRun ? `${state.lastRun.completed} completed. ${state.lastRun.message}` : queueMessage}</p>}
           </CardContent></Card>
-        <Card><CardHeader><CardTitle>4. Application queue</CardTitle><CardDescription>{filteredJobs.length} jobs. Select one to tailor or submit.</CardDescription></CardHeader><CardContent className="space-y-3">
+        <Card><CardHeader><CardTitle>4. Application queue</CardTitle><CardDescription>{filteredJobs.length} jobs. Check jobs to include in the next queue run; with none checked, the latest search or imported jobs are prepared.</CardDescription></CardHeader><CardContent className="space-y-3">
           <Input aria-label="Filter jobs" placeholder="Filter by company or title" value={searchText} onChange={e => setSearchText(e.target.value)} />
-          {filteredJobs.map(job => { const a = state?.applications.find(item => item.jobId === job.id); return <button key={job.id} className={`w-full text-left rounded-lg border p-3 hover:border-primary ${selectedId === job.id ? 'border-primary bg-accent/30' : ''}`} onClick={() => selectJob(job)}>
+          {filteredJobs.map(job => { const a = state?.applications.find(item => item.jobId === job.id); return <div key={job.id} className="flex items-start gap-2"><input type="checkbox" className="mt-4" aria-label={`Include ${job.title} at ${job.company} in queue`} checked={selectedJobIds.includes(job.id)} onChange={e => setSelectedJobIds(current => e.target.checked ? [...current, job.id] : current.filter(id => id !== job.id))} /><button className={`w-full text-left rounded-lg border p-3 hover:border-primary ${selectedId === job.id ? 'border-primary bg-accent/30' : ''}`} onClick={() => selectJob(job)}>
             <strong className="block">{job.title}</strong><span className="text-sm text-muted-foreground">{job.company} · {job.source}</span>
-            <div className="mt-2"><Badge variant="outline">{a ? statusNames[a.status] || a.status : 'Found'}</Badge></div></button>; })}
+            <div className="mt-2"><Badge variant="outline">{a ? statusNames[a.status] || a.status : 'Found'}</Badge></div></button></div>; })}
           {!filteredJobs.length && <p className="text-sm text-muted-foreground">No jobs yet. Search or import a URL.</p>}
         </CardContent></Card>
         <Card><CardHeader><CardTitle>{selectedJob ? `${selectedJob.title} · ${selectedJob.company}` : 'Choose a job'}</CardTitle>
           {selectedJob && <CardDescription>{selectedJob.source} · {selectedJob.verifiedAt ? 'Page checked' : 'Description provided manually'} · <a className="underline" href={selectedJob.url} target="_blank" rel="noopener noreferrer">View listing <ExternalLink className="inline h-3 w-3" /></a></CardDescription>}</CardHeader>
           <CardContent className="space-y-4">
             {selectedJob && <><p className="text-sm max-h-40 overflow-auto whitespace-pre-wrap">{selectedJob.description}</p>
-              {!selectedApplication && <Button disabled={Boolean(busy) || !state?.resume} onClick={() => run('tailor', () => jobPost(`/${selectedId}/tailor`, {}))}>Tailor resume for this job</Button>}
-              {selectedApplication && <ApplicationDetail application={selectedApplication} latex={latex} setLatex={setLatex} manualReceipt={manualReceipt} setManualReceipt={setManualReceipt} busy={busy} run={run} />}
+              {(!selectedApplication || !['submitted','submitted_manually','submission_unknown','submitting'].includes(selectedApplication.status)) && <Button disabled={Boolean(busy) || !profileSaved || !state?.resume} onClick={() => run('tailor', () => jobPost(`/${selectedId}/tailor`, {}))}>{selectedApplication ? 'Regenerate from current resume' : 'Tailor resume for this job'}</Button>}
+              {selectedApplication && <ApplicationDetail application={selectedApplication} latex={latex} setLatex={setLatex} manualReceipt={manualReceipt} setManualReceipt={setManualReceipt} busy={busy} profileSaved={profileSaved} run={run} />}
             </>}
           </CardContent></Card>
       </div>
@@ -255,9 +267,9 @@ export default function JobSearch() {
   </div>;
 }
 
-function ApplicationDetail({ application, latex, setLatex, manualReceipt, setManualReceipt, busy, run }: {
+function ApplicationDetail({ application, latex, setLatex, manualReceipt, setManualReceipt, busy, profileSaved, run }: {
   application: Application; latex: string; setLatex: (s: string) => void; manualReceipt: string; setManualReceipt: (s: string) => void;
-  busy: string; run: (key: string, action: () => Promise<JobState>) => Promise<void>;
+  busy: string; profileSaved: boolean; run: (key: string, action: () => Promise<JobState>) => Promise<void>;
 }) {
   const id = application.jobId;
   return <div className="space-y-4 border-t pt-4">
@@ -269,10 +281,10 @@ function ApplicationDetail({ application, latex, setLatex, manualReceipt, setMan
       {application.pdfHash && <FileLink name={`${id}.pdf`} label="Preview tailored PDF" preview />}</div>
     {!['submitted','submitted_manually','submission_unknown','submitting'].includes(application.status) && <div className="space-y-2"><Label htmlFor="latex">Edit reconstructed LaTeX</Label>
       <Textarea id="latex" className="font-mono min-h-48" value={latex} onChange={e => setLatex(e.target.value)} placeholder="Select this job again to load its LaTeX source." />
-      <Button variant="outline" disabled={Boolean(busy) || !latex} onClick={() => run('compile', () => jobPost(`/${id}/compile`, { latex }))}>Compile edited LaTeX</Button></div>}
+      <Button variant="outline" disabled={Boolean(busy) || !profileSaved || !latex} onClick={() => run('compile', () => jobPost(`/${id}/compile`, { latex }))}>Compile edited LaTeX</Button></div>}
     {application.pdfHash && application.status === 'needs_review' && <div className="space-y-2"><p className="text-sm">Compare the preview with the original PDF. Check names, dates, metrics, layout, links and every claim.</p>
-      <Button disabled={Boolean(busy)} onClick={() => run('review', () => jobPost(`/${id}/review`, { pdfHash: application.pdfHash }))}><ShieldCheck className="h-4 w-4 mr-2" />I reviewed this PDF</Button></div>}
-    {['ready','needs_input'].includes(application.status) && <Button disabled={Boolean(busy)} onClick={() => run('apply', () => jobPost(`/${id}/apply`, {}))}>{application.status === 'needs_input' ? 'Resume in open browser' : 'Open browser, fill and submit'}</Button>}
+      <Button disabled={Boolean(busy) || !profileSaved} onClick={() => run('review', () => jobPost(`/${id}/review`, { pdfHash: application.pdfHash }))}><ShieldCheck className="h-4 w-4 mr-2" />I reviewed this PDF</Button></div>}
+    {['ready','needs_input'].includes(application.status) && <Button disabled={Boolean(busy) || !profileSaved} onClick={() => run('apply', () => jobPost(`/${id}/apply`, {}))}>{application.status === 'needs_input' ? 'Resume in open browser' : 'Open browser, fill and submit'}</Button>}
     {application.status === 'submission_unknown' && <Button variant="outline" disabled={Boolean(busy)} onClick={() => run('check', () => jobPost(`/${id}/receipt`, {}))}>Check for receipt</Button>}
     {['ready','needs_input','submission_unknown'].includes(application.status) && <div className="space-y-2 border-t pt-3"><Label htmlFor="manualReceipt">If you submitted it yourself, enter the confirmation or reference</Label>
       <div className="flex gap-2"><Input id="manualReceipt" value={manualReceipt} onChange={e => setManualReceipt(e.target.value)} placeholder="Confirmation text or reference" />

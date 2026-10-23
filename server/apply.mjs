@@ -82,6 +82,22 @@ export async function receiptOn(page) {
   return null;
 }
 
+export async function receiptOnPages(pages) {
+  for (const page of [...pages].reverse()) {
+    if (page.isClosed()) continue;
+    const receipt = await receiptOn(page).catch(() => null);
+    if (receipt) return receipt;
+  }
+  return null;
+}
+
+function trackJobPages(session) {
+  session.context.on('page', async page => {
+    const opener = await page.opener().catch(() => null);
+    if (session.jobId && opener && session.jobPages?.has(opener)) session.jobPages.add(page);
+  });
+}
+
 // Local, visible browsers allow users to handle portal-specific login and questions.
 // Universal coverage is deliberately not claimed: complex/multistep forms hand off.
 export class ApplicationRunner {
@@ -100,8 +116,9 @@ export class ApplicationRunner {
         catch { await route.abort(); }
       });
       await context.routeWebSocket('**/*', ws => ws.close());
-      session = { context, page: context.pages()[0] || await context.newPage(), jobId: null };
+      session = { context, page: context.pages()[0] || await context.newPage(), jobId: null, jobPages: new Set() };
       this.sessions.set(user, session);
+      trackJobPages(session);
       context.on('close', () => this.sessions.delete(user));
     }
     if (session.jobId) throw new Error('Finish or close the current application browser before opening another account.');
@@ -124,29 +141,35 @@ export class ApplicationRunner {
       });
       await context.routeWebSocket('**/*', ws => ws.close());
       const page = context.pages()[0] || await context.newPage();
-      session = { context, page, jobId: job.id };
+      session = { context, page, jobId: job.id, jobPages: new Set([page]) };
       this.sessions.set(user, session);
+      trackJobPages(session);
       context.on('close', () => this.sessions.delete(user));
       try { await page.goto(job.url, { waitUntil: 'domcontentloaded', timeout: 30_000 }); }
       catch { /* A partially loaded page can still be completed by the user. */ }
     } else if (!session.jobId) {
       session.jobId = job.id;
       session.page = await session.context.newPage();
+      session.jobPages = new Set([session.page]);
       await session.page.goto(job.url, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     }
-    const page = session.context.pages().at(-1) || session.page;
+    let page = session.page;
     // A receipt from a previous session cannot verify a new submission.
-    const existingReceipt = await receiptOn(page);
+    const existingReceipt = await receiptOnPages(session.jobPages);
     if (existingReceipt) return { status: 'needs_input', message: 'This browser already shows a receipt. Verify the job and record it manually.' };
-    const body = await page.locator('body').innerText().catch(() => '');
-    if (/verify (you are|you're) human|complete the captcha|security verification/i.test(body)) {
-      return { status: 'needs_input', message: 'Complete the CAPTCHA in the application browser, then resume.' };
-    }
     let scope;
-    for (const frame of page.frames()) {
-      // Only automate a form that explicitly accepts a resume; do not fill newsletters.
-      for (const form of await frame.locator('form').all()) {
-        if (await form.locator('input[type=file]').count()) { scope = form; break; }
+    for (const candidate of [...session.jobPages].reverse()) {
+      if (candidate.isClosed()) continue;
+      const body = await candidate.locator('body').innerText().catch(() => '');
+      if (/verify (you are|you're) human|complete the captcha|security verification/i.test(body)) {
+        return { status: 'needs_input', message: 'Complete the CAPTCHA in the application browser, then resume.' };
+      }
+      for (const frame of candidate.frames()) {
+        // Only automate a form that explicitly accepts a resume; do not fill newsletters.
+        for (const form of await frame.locator('form').all()) {
+          if (await form.locator('input[type=file]').count()) { scope = form; page = candidate; break; }
+        }
+        if (scope) break;
       }
       if (scope) break;
     }
@@ -166,7 +189,7 @@ export class ApplicationRunner {
     try {
       await submit.click({ timeout: 15_000 });
       for (let attempt = 0; attempt < 15; attempt++) {
-        const receipt = await receiptOn(page);
+        const receipt = await receiptOnPages(session.jobPages);
         if (receipt) return { status: 'submitted', receipt, message: 'The application page confirmed receipt.' };
         await page.waitForTimeout(1000);
       }
@@ -175,7 +198,7 @@ export class ApplicationRunner {
   }
   async check(user) {
     const session = this.sessions.get(user);
-    return session ? receiptOn(session.context.pages().at(-1) || session.page) : null;
+    return session ? receiptOnPages(session.jobPages || new Set([session.page])) : null;
   }
   async close(user) { await this.sessions.get(user)?.context.close(); this.sessions.delete(user); }
 }

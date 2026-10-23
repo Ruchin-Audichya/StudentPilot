@@ -79,8 +79,8 @@ export type SearchCoverage = { source: string; count: number; rejected: number; 
 
 // StudentPilot's existing scrapers and the twelve-board search run together.
 // Each source reports its own outcome; the UI never invents a listing on failure.
-export async function searchInternshipsExpanded(params: JobSearchParams): Promise<{ jobs: JobResult[]; coverage: SearchCoverage[] }> {
-  const primary = searchInternships(params);
+export async function searchInternshipsExpanded(params: JobSearchParams, onProgress?: (jobs: JobResult[]) => void): Promise<{ jobs: JobResult[]; coverage: SearchCoverage[] }> {
+  const primary = searchInternships(params).then(jobs => { onProgress?.(jobs); return jobs; });
   const expanded = (async () => {
     const health = await jobRequest<Health>('/health');
     if (!health.search) return { jobs: [] as JobResult[], coverage: [{ source: '12 job boards + company careers', count: 0, rejected: 0, error: 'Configure BRAVE_SEARCH_API_KEY on the job service' }] };

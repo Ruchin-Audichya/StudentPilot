@@ -150,11 +150,12 @@ export default memo(function JobCard({ job }: Props) {
       )}
 
       <div className="mt-auto pt-4 flex items-center justify-between gap-2 flex-wrap">
-        <Button asChild className="gradient-primary text-white w-full sm:w-auto">
+        {applyHref ? <Button asChild className="gradient-primary text-white w-full sm:w-auto">
           <Link to={queueHref} onClick={() => sessionStorage.setItem('studentpilot.selectedJob', JSON.stringify(job))}>Tailor &amp; apply</Link>
-        </Button>
+        </Button> : <Button disabled className="w-full sm:w-auto">No application URL</Button>}
         <button
-          onClick={() => applyHref && window.open(applyHref, "_blank")}
+          disabled={!applyHref}
+          onClick={() => window.open(applyHref, "_blank", "noopener,noreferrer")}
           className="text-sm px-3 py-1 rounded-full bg-white/5 border border-card-border hover:bg-white/10 transition w-full sm:w-auto"
         >
           Details

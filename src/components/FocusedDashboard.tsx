@@ -10,6 +10,15 @@ import { searchInternshipsExpanded, type JobResult, type SearchCoverage } from '
 type StudentProfile = { name: string; skills: string[]; interests: string[] };
 type DashboardProps = { profile?: StudentProfile };
 
+function uniqueJobs(jobs: JobResult[]) {
+  const seen = new Set<string>();
+  return jobs.filter(job => {
+    const key = (job.url || `${job.title}|${job.company}`).toLowerCase().split('?')[0];
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+}
+
 function savedProfile(): StudentProfile | null {
   try {
     const value = JSON.parse(localStorage.getItem('onboarding') || 'null');
@@ -34,19 +43,13 @@ export default function FocusedDashboard({ profile }: DashboardProps) {
     (source === 'All sources' || job.source === source) && (!paidOnly || Boolean(job.stipend))), [jobs, source, paidOnly]);
 
   async function search() {
-    setBusy(true); setError(''); setSearched(true); setCoverage([]);
+    setBusy(true); setError(''); setSearched(true); setCoverage([]); setJobs([]); setSource('All sources');
     try {
       const result = await searchInternshipsExpanded({
         skills: Array.isArray(candidate?.skills) ? candidate.skills : [],
         interests: role.trim() ? [role.trim()] : [], location: location.trim() || 'India',
-      });
-      const seen = new Set<string>();
-      const unique = result.jobs.filter(job => {
-        const key = (job.url || `${job.title}|${job.company}`).toLowerCase().split('?')[0];
-        if (seen.has(key)) return false;
-        seen.add(key); return true;
-      });
-      setJobs(unique); setCoverage(result.coverage); setSource('All sources');
+      }, found => setJobs(uniqueJobs(found)));
+      setJobs(uniqueJobs(result.jobs)); setCoverage(result.coverage);
     } catch (cause) { setError((cause as Error).message || 'Search failed. Check the backend and try again.'); }
     finally { setBusy(false); }
   }
@@ -78,7 +81,7 @@ export default function FocusedDashboard({ profile }: DashboardProps) {
 
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div><h2 className="text-xl font-bold">Internships</h2><p className="text-sm text-muted-foreground">{searched ? `${visible.length} matching listings` : 'Choose a role and search to see listings.'}</p></div>
+          <div><h2 className="text-xl font-bold">Internships</h2><p className="text-sm text-muted-foreground">{searched ? `${visible.length} matching listings${busy ? ' · checking more sources…' : ''}` : 'Choose a role and search to see listings.'}</p></div>
           {jobs.length > 0 && <div className="flex items-center gap-3 text-sm"><SlidersHorizontal className="h-4 w-4" />
             <select aria-label="Filter by source" className="rounded-md border border-card-border bg-background px-2 py-2" value={source} onChange={event => setSource(event.target.value)}>{sources.map(value => <option key={value}>{value}</option>)}</select>
             <label className="flex items-center gap-2 whitespace-nowrap"><input type="checkbox" checked={paidOnly} onChange={event => setPaidOnly(event.target.checked)} />Paid only</label>
